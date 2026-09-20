@@ -119,31 +119,26 @@
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add("stop");
 
-            // إرسال طلب Ticks متوافق 100% مع Deriv API
+            // طلب اشتراك مباشر وبسيط فـ الـ Ticks
             ws.send(JSON.stringify({
-                ticks_history: symbol,
-                adjust_start_time: 1,
-                count: 1,
-                end: "latest",
-                start: 1,
-                style: "ticks",
-                subscribe: 1
+                ticks: symbol
             }));
         };
 
         ws.onmessage = (msg) => {
             const data = JSON.parse(msg.data);
             
-            // التعامل مع التحديثات المباشرة (Tick stream)
-            let quote = null;
-            if (data.msg_type === 'tick' && data.tick) {
-                quote = data.tick.quote;
-            } else if (data.msg_type === 'history' && data.history && data.history.prices) {
-                quote = data.history.prices[data.history.prices.length - 1];
+            // قراءة السعر سواك كان فـ tick أو فـ history
+            let rawPrice = null;
+
+            if (data.tick && data.tick.quote !== undefined) {
+                rawPrice = data.tick.quote;
+            } else if (data.history && data.history.prices && data.history.prices.length > 0) {
+                rawPrice = data.history.prices[data.history.prices.length - 1];
             }
 
-            if (quote !== null) {
-                const formattedPrice = String(quote);
+            if (rawPrice !== null) {
+                const formattedPrice = String(rawPrice);
                 const lastDigitStr = formattedPrice.slice(-1);
 
                 document.getElementById("currentPrice").innerText = formattedPrice;
