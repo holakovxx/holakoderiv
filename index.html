@@ -137,39 +137,25 @@
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add("stop");
 
-            log("تم الاتصال. إرسال طلب Ticks...");
+            log("تم الاتصال. إرسال طلب الاشتراك فـ Ticks...");
 
-            // طلب الاشتراك فـ Ticks مع التضمين المباشر
+            // طلب الاشتراك المباشر القياسي المعتمد فـ Deriv
             ws.send(JSON.stringify({
-                ticks_history: symbol,
-                adjust_start_time: 1,
-                count: 10,
-                end: "latest",
-                start: 1,
-                style: "ticks",
-                subscribe: 1
+                ticks: symbol
             }));
         };
 
         ws.onmessage = (msg) => {
             const data = JSON.parse(msg.data);
-            log("وصلت بيانات: " + data.msg_type);
 
             if (data.error) {
                 log("خطأ من Deriv: " + data.error.message);
                 return;
             }
 
-            let price = null;
-
             if (data.msg_type === 'tick' && data.tick) {
-                price = data.tick.quote;
-            } else if (data.msg_type === 'history' && data.history && data.history.prices) {
-                const prices = data.history.prices;
-                price = prices[prices.length - 1];
-            }
-
-            if (price !== null && price !== undefined) {
+                log("وصل Tick بنجاح!");
+                const price = data.tick.quote;
                 const formattedPrice = String(price);
                 const lastDigitStr = formattedPrice.slice(-1);
 
