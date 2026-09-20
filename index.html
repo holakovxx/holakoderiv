@@ -87,15 +87,18 @@
     <h2>Expert Analysis Tool V2</h2>
     
     <select id="symbolSelect">
-        <option value="1HZ10V">Volatility 10 Index</option>
+        <!-- المؤشرات العادية (Standard Indices) -->
+        <option value="R_10">Volatility 10 Index</option>
+        <option value="R_25">Volatility 25 Index</option>
+        <option value="R_50">Volatility 50 Index</option>
+        <option value="R_75">Volatility 75 Index</option>
+        <option value="R_100">Volatility 100 Index</option>
+
+        <!-- مؤشرات الثواني (1s Indices) -->
         <option value="1HZ10V">Volatility 10 (1s) Index</option>
-        <option value="1HZ25V">Volatility 25 Index</option>
         <option value="1HZ25V" selected>Volatility 25 (1s) Index</option>
-        <option value="1HZ50V">Volatility 50 Index</option>
         <option value="1HZ50V">Volatility 50 (1s) Index</option>
-        <option value="1HZ75V">Volatility 75 Index</option>
         <option value="1HZ75V">Volatility 75 (1s) Index</option>
-        <option value="1HZ100V">Volatility 100 Index</option>
         <option value="1HZ100V">Volatility 100 (1s) Index</option>
     </select>
 
@@ -146,7 +149,7 @@
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add('stop');
 
-            // إرسال الرمز المحدد ديناميكياً
+            // إرسال الرمز الصحيح للمؤشر المطلوب
             ws.send(JSON.stringify({
                 ticks: symbol
             }));
