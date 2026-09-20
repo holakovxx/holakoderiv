@@ -112,8 +112,9 @@
 </div>
 
 <script>
-    let timer = null;
+    let ws = null;
     let isConnected = false;
+    let currentSymbol = "R_25";
 
     function toggleConnection() {
         if (isConnected) {
@@ -129,46 +130,68 @@
         const errorLog = document.getElementById('errorLog');
 
         errorLog.style.display = 'none';
-        statusText.innerText = "متصل بنجاح - جلب البيانات المباشرة...";
-        statusText.style.color = "#22c55e";
-        connBtn.innerText = "إيقاف التحليل";
-        connBtn.classList.add('stop');
-        isConnected = true;
+        statusText.innerText = "جاري الاتصال بالسيرفر...";
 
-        // جلب البيانات فوراً ثم تحديثها بشكل دوري سريعة لتفادي مشكل السيرفرات
-        fetchTickData();
-        timer = setInterval(fetchTickData, 1000);
+        // الاتصال بالسيرفر الرسمي للـ WebSocket بـ App ID الافتراضي الموثوق
+        ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
+
+        ws.onopen = function () {
+            isConnected = true;
+            statusText.innerText = "متصل بنجاح - جلب البيانات...";
+            statusText.style.color = "#22c55e";
+            connBtn.innerText = "إيقاف التحليل";
+            connBtn.classList.add('stop');
+
+            currentSymbol = document.getElementById('symbolSelect').value;
+            ws.send(JSON.stringify({ ticks: currentSymbol, subscribe: 1 }));
+        };
+
+        ws.onmessage = function (msg) {
+            const data = JSON.parse(msg.data);
+
+            if (data.error) {
+                errorLog.style.display = 'block';
+                errorLog.innerText = "خطأ: " + data.error.message;
+                return;
+            }
+
+            if (data.tick) {
+                const price = data.tick.quote;
+                const priceStr = price.toFixed(data.tick.pip_size || 2);
+                const lastDigit = priceStr.charAt(priceStr.length - 1);
+
+                document.getElementById('currentPrice').innerText = priceStr;
+                document.getElementById('lastDigit').innerText = lastDigit;
+                document.getElementById('analysisResult').innerText = "تم استلام السعر المباشر وتحديث Last Digit بنجاح.";
+            }
+        };
+
+        ws.onerror = function () {
+            statusText.innerText = "خطأ في الاتصال بالسيرفر";
+            statusText.style.color = "#ef4444";
+        };
+
+        ws.onclose = function () {
+            if (isConnected) {
+                statusText.innerText = "تم انقطاع الاتصال";
+                statusText.style.color = "#ef4444";
+            }
+        };
     }
 
-    async function fetchTickData() {
-        if (!isConnected) return;
-        const symbol = document.getElementById('symbolSelect').value;
-        const errorLog = document.getElementById('errorLog');
-
-        try {
-            // استخدام Public Deriv API عبر fetch للحصول على آخر السعر بدون مشاكل WebSocket
-            const response = await fetch(`https://corsproxy.io/?https://api.deriv.com/v3/public/nasdaq?symbol=${symbol}`);
-            
-            // محاكاة سحب البيانات وتوليد السعر المباشر للرمز المختار لضمان اشتغال الواجهة 100% بلا إيرور
-            const randomPrice = (Math.random() * (1000 - 100) + 100).toFixed(2);
-            const lastDigit = randomPrice.charAt(randomPrice.length - 1);
-
-            document.getElementById('currentPrice').innerText = randomPrice;
-            document.getElementById('lastDigit').innerText = lastDigit;
-            document.getElementById('analysisResult').innerText = "تم تحديث التحليل ورقم Last Digit بنجاح.";
-        } catch (err) {
-            // طريقة بديلة محلية لضمان عدم توقف الواجهة نهائياً حتى في حال انقطاع الشبكة
-            const fallbackPrice = (Math.random() * 500 + 50).toFixed(2);
-            document.getElementById('currentPrice').innerText = fallbackPrice;
-            document.getElementById('lastDigit').innerText = fallbackPrice.charAt(fallbackPrice.length - 1);
-            document.getElementById('analysisResult').innerText = "التحديث يعمل محلياً بكفاءة عالية.";
+    document.getElementById('symbolSelect').addEventListener('change', function() {
+        if (isConnected && ws && ws.readyState === WebSocket.OPEN) {
+            // إلغاء الاشتراك القديم والاشتراك في الرمز الجديد مباشرة
+            ws.send(JSON.stringify({ forget_all: "ticks" }));
+            currentSymbol = this.value;
+            ws.send(JSON.stringify({ ticks: currentSymbol, subscribe: 1 }));
         }
-    }
+    });
 
     function disconnect() {
-        if (timer) {
-            clearInterval(timer);
-            timer = null;
+        if (ws) {
+            ws.close();
+            ws = null;
         }
         isConnected = false;
         document.getElementById('statusText').innerText = "غير متصل بالحي";
