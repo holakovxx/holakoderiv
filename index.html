@@ -130,10 +130,10 @@
         const errorLog = document.getElementById('errorLog');
 
         errorLog.style.display = 'none';
-        statusText.innerText = "جاري الاتصال بالسيرفر...";
+        statusText.innerText = "جاري الاتصال بالسيرفر البديل...";
 
-        // الاتصال بالسيرفر الرسمي للـ WebSocket بـ App ID الافتراضي الموثوق
-        ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
+        // الاتصال بالخادم المباشر الثاني لشركة Deriv لتجاوز حظر الرموز
+        ws = new WebSocket('wss://green.derivws.com/websockets/v3?app_id=1089');
 
         ws.onopen = function () {
             isConnected = true;
@@ -143,7 +143,7 @@
             connBtn.classList.add('stop');
 
             currentSymbol = document.getElementById('symbolSelect').value;
-            ws.send(JSON.stringify({ ticks: currentSymbol, subscribe: 1 }));
+            sendSubscription();
         };
 
         ws.onmessage = function (msg) {
@@ -151,7 +151,7 @@
 
             if (data.error) {
                 errorLog.style.display = 'block';
-                errorLog.innerText = "خطأ: " + data.error.message;
+                errorLog.innerText = "خطأ من السيرفر: " + data.error.message;
                 return;
             }
 
@@ -162,7 +162,7 @@
 
                 document.getElementById('currentPrice').innerText = priceStr;
                 document.getElementById('lastDigit').innerText = lastDigit;
-                document.getElementById('analysisResult').innerText = "تم استلام السعر المباشر وتحديث Last Digit بنجاح.";
+                document.getElementById('analysisResult').innerText = "تم استلام السعر وتحديث Last Digit بنجاح.";
             }
         };
 
@@ -173,18 +173,29 @@
 
         ws.onclose = function () {
             if (isConnected) {
-                statusText.innerText = "تم انقطاع الاتصال";
+                statusText.innerText = "انقطع الاتصال";
                 statusText.style.color = "#ef4444";
             }
         };
     }
 
+    function sendSubscription() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        
+        // إلغاء أي اشتراك سابق لتجنب تداخل البيانات
+        ws.send(JSON.stringify({ forget_all: "ticks" }));
+        
+        // إرسال طلب اشتراك جديد للرمز المحدد
+        ws.send(JSON.stringify({
+            ticks: currentSymbol,
+            subscribe: 1
+        }));
+    }
+
     document.getElementById('symbolSelect').addEventListener('change', function() {
-        if (isConnected && ws && ws.readyState === WebSocket.OPEN) {
-            // إلغاء الاشتراك القديم والاشتراك في الرمز الجديد مباشرة
-            ws.send(JSON.stringify({ forget_all: "ticks" }));
-            currentSymbol = this.value;
-            ws.send(JSON.stringify({ ticks: currentSymbol, subscribe: 1 }));
+        currentSymbol = this.value;
+        if (isConnected) {
+            sendSubscription();
         }
     });
 
