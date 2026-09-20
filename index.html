@@ -22,55 +22,62 @@
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             width: 100%;
-            max-width: 420px;
+            max-width: 400px;
             text-align: center;
         }
-        h2 { color: #38bdf8; margin-bottom: 20px; }
+        h2 {
+            color: #38bdf8;
+            margin-bottom: 20px;
+        }
         select, button {
             width: 100%;
             padding: 12px;
-            margin: 8px 0;
+            margin: 10px 0;
             border-radius: 8px;
             border: none;
             font-size: 16px;
             font-weight: bold;
         }
-        select { background-color: #334155; color: #fff; }
-        button { background-color: #22c55e; color: #fff; cursor: pointer; transition: 0.3s; }
-        button:hover { opacity: 0.9; }
-        button.stop { background-color: #ef4444; }
-        .status { font-size: 14px; color: #94a3b8; margin-bottom: 15px; }
+        select {
+            background-color: #334155;
+            color: #ffffff;
+        }
+        button {
+            background-color: #22c55e;
+            color: #ffffff;
+            cursor: pointer;
+        }
+        button.stop {
+            background-color: #ef4444;
+        }
+        .status {
+            font-size: 14px;
+            margin: 10px 0;
+            color: #94a3b8;
+        }
         .card {
             background-color: #0f172a;
             padding: 15px;
             border-radius: 8px;
             margin-top: 15px;
         }
-        .tick-display { font-size: 32px; font-weight: bold; color: #38bdf8; margin: 10px 0; }
-        .last-digit { font-size: 28px; font-weight: bold; color: #f59e0b; }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 8px;
-            margin-top: 15px;
-        }
-        .digit-box {
-            background-color: #334155;
-            padding: 10px;
-            border-radius: 6px;
-            font-size: 18px;
+        .price {
+            font-size: 24px;
+            color: #38bdf8;
             font-weight: bold;
         }
-        .debug-box {
-            font-size: 11px;
-            color: #fbbf24;
-            background: #000;
+        .digit {
+            font-size: 20px;
+            color: #f59e0b;
+        }
+        .error-log {
+            background-color: #000;
+            color: #f87171;
             padding: 8px;
-            border-radius: 6px;
+            border-radius: 5px;
+            font-size: 12px;
             margin-top: 10px;
             word-break: break-all;
-            max-height: 80px;
-            overflow-y: auto;
         }
     </style>
 </head>
@@ -78,125 +85,116 @@
 
 <div class="container">
     <h2>Expert Analysis Tool V2</h2>
-<select id="symbolSelect">
-    <option value="1HZ10V">Volatility 10 Index</option>
-    <option value="1HZ25V">Volatility 25 Index</option>
-    <option value="1HZ50V">Volatility 50 Index</option>
-    <option value="1HZ75V">Volatility 75 Index</option>
-    <option value="1HZ100V">Volatility 100 Index</option>
-
-    <option value="R_10">Volatility 10 (1s) Index</option>
-    <option value="R_25" selected>Volatility 25 (1s) Index</option>
-    <option value="R_50">Volatility 50 (1s) Index</option>
-    <option value="R_75">Volatility 75 (1s) Index</option>
-    <option value="R_100">Volatility 100 (1s) Index</option>
-</select>
     
-        
-    
+    <select id="symbolSelect">
+        <option value="1HZ10V">Volatility 10 Index</option>
+        <option value="1HZ10V">Volatility 10 (1s) Index</option>
+        <option value="1HZ25V">Volatility 25 Index</option>
+        <option value="1HZ25V" selected>Volatility 25 (1s) Index</option>
+        <option value="1HZ50V">Volatility 50 Index</option>
+        <option value="1HZ50V">Volatility 50 (1s) Index</option>
+        <option value="1HZ75V">Volatility 75 Index</option>
+        <option value="1HZ75V">Volatility 75 (1s) Index</option>
+        <option value="1HZ100V">Volatility 100 Index</option>
+        <option value="1HZ100V">Volatility 100 (1s) Index</option>
+    </select>
 
     <button id="connBtn" onclick="toggleConnection()">بدء التحليل المباشر</button>
     <div class="status" id="statusText">غير متصل بالحي</div>
 
     <div class="card">
         <div>السعر الحالي</div>
-        <div class="tick-display" id="currentPrice">---</div>
-        <div>آخر رقم (Last Digit): <span class="last-digit" id="lastDigit">-</span></div>
+        <div class="price" id="currentPrice">---</div>
+        <div style="margin-top: 10px;">آخر رقم (Last Digit): <span class="digit" id="lastDigit">-</span></div>
     </div>
 
     <div class="card">
         <h3>تحليل الأرقام (آخر 50 Ticks)</h3>
-        <div class="grid" id="digitsGrid"></div>
+        <div id="analysisResult">جاري تجهيز النظام...</div>
     </div>
 
-    <div class="debug-box" id="debugLog">جاري تجهيز النظام V2...</div>
+    <div id="errorLog" class="error-log" style="display:none;"></div>
 </div>
 
 <script>
-    const APP_ID = "1089";
     let ws = null;
-    let ticksHistory = [];
-
-    function log(msg) {
-        document.getElementById("debugLog").innerText = msg;
-    }
+    let isConnected = false;
 
     function toggleConnection() {
-        if (ws) {
-            ws.close();
-            return;
+        if (isConnected) {
+            disconnect();
+        } else {
+            connect();
         }
+    }
 
-        const symbol = document.getElementById("symbolSelect").value;
-        const statusText = document.getElementById("statusText");
-        const connBtn = document.getElementById("connBtn");
+    function connect() {
+        const symbol = document.getElementById('symbolSelect').value;
+        const statusText = document.getElementById('statusText');
+        const connBtn = document.getElementById('connBtn');
+        const errorLog = document.getElementById('errorLog');
 
+        errorLog.style.display = 'none';
         statusText.innerText = "جاري الاتصال...";
-        log("فتح الاتصال المباشر...");
-        ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`);
 
-        ws.onopen = () => {
+        ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
+
+        ws.onopen = function () {
+            isConnected = true;
             statusText.innerText = "متصل بنجاح - جاري جلب البيانات...";
             statusText.style.color = "#22c55e";
             connBtn.innerText = "إيقاف التحليل";
-            connBtn.classList.add("stop");
+            connBtn.classList.add('stop');
 
-            log("تم الاتصال. إرسال طلب Ticks...");
-
+            // إرسال الرمز المحدد ديناميكياً
             ws.send(JSON.stringify({
                 ticks: symbol
             }));
         };
 
-        ws.onmessage = (msg) => {
+        ws.onmessage = function (msg) {
             const data = JSON.parse(msg.data);
 
             if (data.error) {
-                log("خطأ: " + data.error.message);
+                errorLog.style.display = 'block';
+                errorLog.innerText = "خطأ: " + data.error.message;
+                disconnect();
                 return;
             }
 
-            if (data.msg_type === 'tick' && data.tick) {
-                log("تم استقبال Tick بنجاح!");
+            if (data.tick) {
                 const price = data.tick.quote;
-                const formattedPrice = String(price);
-                const lastDigitStr = formattedPrice.slice(-1);
+                const priceStr = price.toString();
+                const lastDigit = priceStr.charAt(priceStr.length - 1);
 
-                document.getElementById("currentPrice").innerText = formattedPrice;
-                document.getElementById("lastDigit").innerText = lastDigitStr;
-
-                ticksHistory.unshift(lastDigitStr);
-                if (ticksHistory.length > 50) ticksHistory.pop();
-
-                updateGrid();
+                document.getElementById('currentPrice').innerText = price;
+                document.getElementById('lastDigit').innerText = lastDigit;
+                document.getElementById('analysisResult').innerText = "تم استلام التيك بنجاح!";
             }
         };
 
-        ws.onclose = () => {
-            statusText.innerText = "غير متصل بالحي";
-            statusText.style.color = "#94a3b8";
-            connBtn.innerText = "بدء التحليل المباشر";
-            connBtn.classList.remove("stop");
-            log("تم إغلاق الاتصال.");
-            ws = null;
+        ws.onerror = function (err) {
+            statusText.innerText = "حدث خطأ فـ الاتصال";
+            statusText.style.color = "#ef4444";
+            disconnect();
         };
 
-        ws.onerror = (err) => {
-            statusText.innerText = "خطأ فـ الاتصال";
-            statusText.style.color = "#ef4444";
-            log("حدث خطأ فـ الشبكة.");
+        ws.onclose = function () {
+            disconnect();
         };
     }
 
-    function updateGrid() {
-        const grid = document.getElementById("digitsGrid");
-        grid.innerHTML = "";
-        ticksHistory.forEach(digit => {
-            const box = document.createElement("div");
-            box.className = "digit-box";
-            box.innerText = digit;
-            grid.appendChild(box);
-        });
+    function disconnect() {
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+        isConnected = false;
+        document.getElementById('statusText').innerText = "غير متصل بالحي";
+        document.getElementById('statusText').style.color = "#94a3b8";
+        const connBtn = document.getElementById('connBtn');
+        connBtn.innerText = "بدء التحليل المباشر";
+        connBtn.classList.remove('stop');
     }
 </script>
 
