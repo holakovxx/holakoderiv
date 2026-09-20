@@ -61,6 +61,17 @@
             font-size: 18px;
             font-weight: bold;
         }
+        .debug-box {
+            font-size: 11px;
+            color: #fbbf24;
+            background: #000;
+            padding: 8px;
+            border-radius: 6px;
+            margin-top: 10px;
+            word-break: break-all;
+            max-height: 80px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -93,12 +104,18 @@
         <h3>تحليل الأرقام (آخر 50 Ticks)</h3>
         <div class="grid" id="digitsGrid"></div>
     </div>
+
+    <div class="debug-box" id="debugLog">جاري تجهيز النظام...</div>
 </div>
 
 <script>
     const APP_ID = "1089";
     let ws = null;
     let ticksHistory = [];
+
+    function log(msg) {
+        document.getElementById("debugLog").innerText = msg;
+    }
 
     function toggleConnection() {
         if (ws) {
@@ -111,6 +128,7 @@
         const connBtn = document.getElementById("connBtn");
 
         statusText.innerText = "جاري الاتصال...";
+        log("فتح الاتصال بـ WebSocket...");
         ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`);
 
         ws.onopen = () => {
@@ -119,20 +137,40 @@
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add("stop");
 
-            // إرسال طلب الاشتراك فـ Ticks مع التضمين المباشر
+            log("تم الاتصال. إرسال طلب Ticks...");
+
+            // طلب الاشتراك فـ Ticks مع التضمين المباشر
             ws.send(JSON.stringify({
-                ticks: symbol,
+                ticks_history: symbol,
+                adjust_start_time: 1,
+                count: 10,
+                end: "latest",
+                start: 1,
+                style: "ticks",
                 subscribe: 1
             }));
         };
 
         ws.onmessage = (msg) => {
             const data = JSON.parse(msg.data);
-            
+            log("وصلت بيانات: " + data.msg_type);
+
+            if (data.error) {
+                log("خطأ من Deriv: " + data.error.message);
+                return;
+            }
+
+            let price = null;
+
             if (data.msg_type === 'tick' && data.tick) {
-                const quote = data.tick.quote;
-                const pipAt = data.tick.pip_size || 2;
-                const formattedPrice = Number(quote).toFixed(pipAt);
+                price = data.tick.quote;
+            } else if (data.msg_type === 'history' && data.history && data.history.prices) {
+                const prices = data.history.prices;
+                price = prices[prices.length - 1];
+            }
+
+            if (price !== null && price !== undefined) {
+                const formattedPrice = String(price);
                 const lastDigitStr = formattedPrice.slice(-1);
 
                 document.getElementById("currentPrice").innerText = formattedPrice;
@@ -150,13 +188,14 @@
             statusText.style.color = "#94a3b8";
             connBtn.innerText = "بدء التحليل المباشر";
             connBtn.classList.remove("stop");
+            log("تم إغلاق الاتصال.");
             ws = null;
         };
 
         ws.onerror = (err) => {
-            console.error("WebSocket Error:", err);
             statusText.innerText = "خطأ فـ الاتصال";
             statusText.style.color = "#ef4444";
+            log("حدث خطأ فـ الشبكة.");
         };
     }
 
