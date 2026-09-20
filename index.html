@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expert Analysis Tool - Deriv</title>
+    <title>Expert Analysis Tool - Deriv V2</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -77,7 +77,7 @@
 <body>
 
 <div class="container">
-    <h2>Expert Analysis Tool</h2>
+    <h2>Expert Analysis Tool V2</h2>
     
     <select id="symbolSelect">
         <option value="R_10">Volatility 10 Index</option>
@@ -105,7 +105,7 @@
         <div class="grid" id="digitsGrid"></div>
     </div>
 
-    <div class="debug-box" id="debugLog">جاري تجهيز النظام...</div>
+    <div class="debug-box" id="debugLog">جاري تجهيز النظام V2...</div>
 </div>
 
 <script>
@@ -128,7 +128,7 @@
         const connBtn = document.getElementById("connBtn");
 
         statusText.innerText = "جاري الاتصال...";
-        log("فتح الاتصال بـ WebSocket...");
+        log("فتح الاتصال المباشر...");
         ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`);
 
         ws.onopen = () => {
@@ -137,9 +137,8 @@
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add("stop");
 
-            log("تم الاتصال. إرسال طلب الاشتراك فـ Ticks...");
+            log("تم الاتصال. إرسال طلب Ticks...");
 
-            // طلب الاشتراك المباشر القياسي المعتمد فـ Deriv
             ws.send(JSON.stringify({
                 ticks: symbol
             }));
@@ -149,12 +148,12 @@
             const data = JSON.parse(msg.data);
 
             if (data.error) {
-                log("خطأ من Deriv: " + data.error.message);
+                log("خطأ: " + data.error.message);
                 return;
             }
 
             if (data.msg_type === 'tick' && data.tick) {
-                log("وصل Tick بنجاح!");
+                log("تم استقبال Tick بنجاح!");
                 const price = data.tick.quote;
                 const formattedPrice = String(price);
                 const lastDigitStr = formattedPrice.slice(-1);
