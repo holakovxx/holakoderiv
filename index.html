@@ -122,6 +122,7 @@
 <script>
     let ws = null;
     let isConnected = false;
+    const API_TOKEN = "34rRA67dZx7G2cEeD6OWn"; // الرمز ديالك محفوظ هنا
 
     function toggleConnection() {
         if (isConnected) {
@@ -138,18 +139,19 @@
         const errorLog = document.getElementById('errorLog');
 
         errorLog.style.display = 'none';
-        statusText.innerText = "جاري الاتصال...";
+        statusText.innerText = "جاري الاتصال بالسيرفر...";
 
+        // الاتصال المباشر بالبورت الصحيح
         ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
 
         ws.onopen = function () {
             isConnected = true;
-            statusText.innerText = "متصل بنجاح - جاري جلب البيانات...";
+            statusText.innerText = "متصل بنجاح - جلب البيانات...";
             statusText.style.color = "#22c55e";
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add('stop');
 
-            // إرسال الرمز مع تفعيل الاشتراك المباشر subscribe: 1
+            // إرسال طلب الاشتراك المباشر لجلب الأسعار وأحدث رقم
             ws.send(JSON.stringify({
                 ticks: symbol,
                 subscribe: 1
@@ -173,7 +175,7 @@
 
                 document.getElementById('currentPrice').innerText = price;
                 document.getElementById('lastDigit').innerText = lastDigit;
-                document.getElementById('analysisResult').innerText = "تم استلام التيك بنجاح وتحديث الرقم!";
+                document.getElementById('analysisResult').innerText = "تم استلام السعر وتحديث آخر رقم بنجاح!";
             }
         };
 
@@ -195,6 +197,7 @@
         }
         isConnected = false;
         document.getElementById('statusText').innerText = "غير متصل بالحي";
+        document.getElementById('statusText5').style?.color = "#94a3b8";
         document.getElementById('statusText').style.color = "#94a3b8";
         const connBtn = document.getElementById('connBtn');
         connBtn.innerText = "بدء التحليل المباشر";
