@@ -114,24 +114,36 @@
         ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`);
 
         ws.onopen = () => {
-            statusText.innerText = "متصل بنجاح - جاري استقبال Ticks...";
+            statusText.innerText = "متصل بنجاح - جاري جلب البيانات...";
             statusText.style.color = "#22c55e";
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add("stop");
 
-            // طلب الاشتراك المباشر فـ الأسعار
+            // إرسال طلب Ticks متوافق 100% مع Deriv API
             ws.send(JSON.stringify({
-                ticks: symbol,
+                ticks_history: symbol,
+                adjust_start_time: 1,
+                count: 1,
+                end: "latest",
+                start: 1,
+                style: "ticks",
                 subscribe: 1
             }));
         };
 
         ws.onmessage = (msg) => {
             const data = JSON.parse(msg.data);
-            if (data.msg_type === 'tick') {
-                const quote = data.tick.quote;
-                const pipAt = data.tick.pip_size || 2;
-                const formattedPrice = parseFloat(quote).toFixed(pipAt);
+            
+            // التعامل مع التحديثات المباشرة (Tick stream)
+            let quote = null;
+            if (data.msg_type === 'tick' && data.tick) {
+                quote = data.tick.quote;
+            } else if (data.msg_type === 'history' && data.history && data.history.prices) {
+                quote = data.history.prices[data.history.prices.length - 1];
+            }
+
+            if (quote !== null) {
+                const formattedPrice = String(quote);
                 const lastDigitStr = formattedPrice.slice(-1);
 
                 document.getElementById("currentPrice").innerText = formattedPrice;
