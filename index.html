@@ -119,26 +119,20 @@
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add("stop");
 
-            // طلب اشتراك مباشر وبسيط فـ الـ Ticks
+            // إرسال طلب الاشتراك فـ Ticks مع التضمين المباشر
             ws.send(JSON.stringify({
-                ticks: symbol
+                ticks: symbol,
+                subscribe: 1
             }));
         };
 
         ws.onmessage = (msg) => {
             const data = JSON.parse(msg.data);
             
-            // قراءة السعر سواك كان فـ tick أو فـ history
-            let rawPrice = null;
-
-            if (data.tick && data.tick.quote !== undefined) {
-                rawPrice = data.tick.quote;
-            } else if (data.history && data.history.prices && data.history.prices.length > 0) {
-                rawPrice = data.history.prices[data.history.prices.length - 1];
-            }
-
-            if (rawPrice !== null) {
-                const formattedPrice = String(rawPrice);
+            if (data.msg_type === 'tick' && data.tick) {
+                const quote = data.tick.quote;
+                const pipAt = data.tick.pip_size || 2;
+                const formattedPrice = Number(quote).toFixed(pipAt);
                 const lastDigitStr = formattedPrice.slice(-1);
 
                 document.getElementById("currentPrice").innerText = formattedPrice;
