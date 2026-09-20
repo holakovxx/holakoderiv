@@ -87,14 +87,11 @@
     <h2>Expert Analysis Tool V2</h2>
     
     <select id="symbolSelect">
-        <!-- المؤشرات العادية (Standard Indices) -->
         <option value="R_10">Volatility 10 Index</option>
         <option value="R_25">Volatility 25 Index</option>
         <option value="R_50">Volatility 50 Index</option>
         <option value="R_75">Volatility 75 Index</option>
         <option value="R_100">Volatility 100 Index</option>
-
-        <!-- مؤشرات الثواني (1s Indices) -->
         <option value="1HZ10V">Volatility 10 (1s) Index</option>
         <option value="1HZ25V" selected>Volatility 25 (1s) Index</option>
         <option value="1HZ50V">Volatility 50 (1s) Index</option>
@@ -122,7 +119,7 @@
 <script>
     let ws = null;
     let isConnected = false;
-    const API_TOKEN = "34rRA67dZx7G2cEeD6OWn"; // الرمز ديالك محفوظ هنا
+    let currentSubscriptionId = null;
 
     function toggleConnection() {
         if (isConnected) {
@@ -133,7 +130,6 @@
     }
 
     function connect() {
-        const symbol = document.getElementById('symbolSelect').value;
         const statusText = document.getElementById('statusText');
         const connBtn = document.getElementById('connBtn');
         const errorLog = document.getElementById('errorLog');
@@ -141,7 +137,6 @@
         errorLog.style.display = 'none';
         statusText.innerText = "جاري الاتصال بالسيرفر...";
 
-        // الاتصال المباشر بالبورت الصحيح
         ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
 
         ws.onopen = function () {
@@ -151,11 +146,7 @@
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add('stop');
 
-            // إرسال طلب الاشتراك المباشر لجلب الأسعار وأحدث رقم
-            ws.send(JSON.stringify({
-                ticks: symbol,
-                subscribe: 1
-            }));
+            subscribeToSymbol();
         };
 
         ws.onmessage = function (msg) {
@@ -164,22 +155,21 @@
             if (data.error) {
                 errorLog.style.display = 'block';
                 errorLog.innerText = "خطأ: " + data.error.message;
-                disconnect();
                 return;
             }
 
             if (data.tick) {
                 const price = data.tick.quote;
-                const priceStr = price.toString();
+                const priceStr = price.toFixed(data.tick.pip_size || 2);
                 const lastDigit = priceStr.charAt(priceStr.length - 1);
 
-                document.getElementById('currentPrice').innerText = price;
+                document.getElementById('currentPrice').innerText = priceStr;
                 document.getElementById('lastDigit').innerText = lastDigit;
                 document.getElementById('analysisResult').innerText = "تم استلام السعر وتحديث آخر رقم بنجاح!";
             }
         };
 
-        ws.onerror = function (err) {
+        ws.onerror = function () {
             statusText.innerText = "حدث خطأ في الاتصال";
             statusText.style.color = "#ef4444";
             disconnect();
@@ -190,12 +180,36 @@
         };
     }
 
+    function subscribeToSymbol() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        
+        const symbol = document.getElementById('symbolSelect').value;
+        
+        // إلغاء الاشتراك السابق إن وجد لتفادي التداخل
+        if (currentSubscriptionId) {
+            ws.send(JSON.stringify({ forget: currentSubscriptionId }));
+        }
+
+        ws.send(JSON.stringify({
+            ticks: symbol,
+            subscribe: 1
+        }));
+    }
+
+    // تغيير الرمز مباشرة إذا كان الاتصال خدام
+    document.getElementById('symbolSelect').addEventListener('change', function() {
+        if (isConnected) {
+            subscribeToSymbol();
+        }
+    });
+
     function disconnect() {
         if (ws) {
             ws.close();
             ws = null;
         }
         isConnected = false;
+        currentSubscriptionId = null;
         document.getElementById('statusText').innerText = "غير متصل بالحي";
         document.getElementById('statusText').style.color = "#94a3b8";
         const connBtn = document.getElementById('connBtn');
