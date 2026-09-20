@@ -5,39 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expert Analysis Tool - Deriv</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: #0d1117; color: #c9d1d9; padding: 15px; text-align: center; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-        h2 { color: #58a6ff; font-size: 1.1rem; margin-bottom: 10px; }
-        select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #30363d; background: #21262d; color: #fff; font-size: 1rem; font-weight: bold; }
-        button { background: #238636; border: none; cursor: pointer; transition: 0.2s; }
-        button:hover { background: #2ea043; }
-        .tick-display { font-size: 2rem; font-weight: bold; color: #58a6ff; margin: 10px 0; }
-        .last-digit { font-size: 2.5rem; color: #f0883e; font-weight: bold; }
-        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 10px; }
-        .digit-box { background: #21262d; border: 1px solid #30363d; padding: 8px; border-radius: 6px; font-size: 0.85rem; }
-        .digit-box span { display: block; font-size: 1.1rem; font-weight: bold; color: #fff; }
-        .prediction-box { background: #1f6feb22; border: 1px solid #1f6feb; color: #58a6ff; padding: 12px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; margin-top: 10px; }
-        .status { font-size: 0.8rem; color: #8b949e; margin-top: 5px; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0f172a;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
+        .container {
+            background-color: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+        h2 { color: #38bdf8; margin-bottom: 20px; }
+        select, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        select { background-color: #334155; color: #fff; }
+        button { background-color: #22c55e; color: #fff; cursor: pointer; transition: 0.3s; }
+        button:hover { opacity: 0.9; }
+        button.stop { background-color: #ef4444; }
+        .status { font-size: 14px; color: #94a3b8; margin-bottom: 15px; }
+        .card {
+            background-color: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .tick-display { font-size: 32px; font-weight: bold; color: #38bdf8; margin: 10px 0; }
+        .last-digit { font-size: 28px; font-weight: bold; color: #f59e0b; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .digit-box {
+            background-color: #334155;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2>Expert Analysis Tool</h2>
-        <select id="symbolPicker" onchange="changeSymbol()">
-            <option value="R_10">Volatility 10 Index</option>
-            <option value="1HZ10V">Volatility 10 (1s) Index</option>
-            <option value="R_25">Volatility 25 Index</option>
-            <option value="R_50">Volatility 50 Index</option>
-            <option value="1HZ50V">Volatility 50 (1s) Index</option>
-            <option value="R_75" selected>Volatility 75 Index</option>
-            <option value="1HZ75V">Volatility 75 (1s) Index</option>
-            <option value="R_100">Volatility 100 Index</option>
-        </select>
-        <button id="connBtn" onclick="toggleConnection()">بدء التحليل المباشر</button>
-        <div class="status" id="statusText">غير متصل بالحي</div>
-    </div>
+<div class="container">
+    <h2>Expert Analysis Tool</h2>
+    
+    <select id="symbolSelect">
+        <option value="R_10">Volatility 10 Index</option>
+        <option value="1HZ10V">Volatility 10 (1s) Index</option>
+        <option value="R_25" selected>Volatility 25 Index</option>
+        <option value="1HZ25V">Volatility 25 (1s) Index</option>
+        <option value="R_50">Volatility 50 Index</option>
+        <option value="1HZ50V">Volatility 50 (1s) Index</option>
+        <option value="R_75">Volatility 75 Index</option>
+        <option value="1HZ75V">Volatility 75 (1s) Index</option>
+        <option value="R_100">Volatility 100 Index</option>
+    </select>
+
+    <button id="connBtn" onclick="toggleConnection()">بدء التحليل المباشر</button>
+    <div class="status" id="statusText">غير متصل بالحي</div>
 
     <div class="card">
         <div>السعر الحالي</div>
@@ -46,104 +90,86 @@
     </div>
 
     <div class="card">
-        <h2>تحليل الأرقام (آخر 50 Ticks)</h2>
+        <h3>تحليل الأرقام (آخر 50 Ticks)</h3>
         <div class="grid" id="digitsGrid"></div>
-        <div class="prediction-box" id="predictionText">في انتظار البيانات...</div>
     </div>
+</div>
 
 <script>
-    // حطينا الـ App ID ديالك هنا مباشرة
-    const APP_ID = "1089"; 
+    const APP_ID = "1089";
     let ws = null;
     let ticksHistory = [];
-    const maxTicks = 50;
 
     function toggleConnection() {
         if (ws) {
             ws.close();
-            ws = null;
-            document.getElementById("connBtn").innerText = "بدء التحليل المباشر";
-            document.getElementById("statusText").innerText = "تم إيقاف الاتصال";
             return;
         }
 
-        const symbol = document.getElementById("symbolPicker").value;
+        const symbol = document.getElementById("symbolSelect").value;
+        const statusText = document.getElementById("statusText");
+        const connBtn = document.getElementById("connBtn");
+
+        statusText.innerText = "جاري الاتصال...";
         ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`);
 
         ws.onopen = () => {
-            document.getElementById("statusText").innerText = "متصل بنجاح - جاري جلب البيانات...";
-            document.getElementById("connBtn").innerText = "إيقاف التحليل";
-            // طلب الاشتراك فـ Ticks
-            ws.send(JSON.stringify({ ticks: symbol }));
+            statusText.innerText = "متصل بنجاح - جاري استقبال Ticks...";
+            statusText.style.color = "#22c55e";
+            connBtn.innerText = "إيقاف التحليل";
+            connBtn.classList.add("stop");
+
+            // طلب الاشتراك المباشر فـ الأسعار
+            ws.send(JSON.stringify({
+                ticks: symbol,
+                subscribe: 1
+            }));
         };
 
         ws.onmessage = (msg) => {
             const data = JSON.parse(msg.data);
             if (data.msg_type === 'tick') {
-                processTick(data.tick);
-            }
-        };
+                const quote = data.tick.quote;
+                const pipAt = data.tick.pip_size || 2;
+                const formattedPrice = parseFloat(quote).toFixed(pipAt);
+                const lastDigitStr = formattedPrice.slice(-1);
 
-        ws.onerror = (err) => {
-            document.getElementById("statusText").innerText = "خطأ فـ الاتصال!";
+                document.getElementById("currentPrice").innerText = formattedPrice;
+                document.getElementById("lastDigit").innerText = lastDigitStr;
+
+                ticksHistory.unshift(lastDigitStr);
+                if (ticksHistory.length > 50) ticksHistory.pop();
+
+                updateGrid();
+            }
         };
 
         ws.onclose = () => {
-            document.getElementById("statusText").innerText = "غير متصل";
+            statusText.innerText = "غير متصل بالحي";
+            statusText.style.color = "#94a3b8";
+            connBtn.innerText = "بدء التحليل المباشر";
+            connBtn.classList.remove("stop");
+            ws = null;
+        };
+
+        ws.onerror = (err) => {
+            console.error("WebSocket Error:", err);
+            statusText.innerText = "خطأ فـ الاتصال";
+            statusText.style.color = "#ef4444";
         };
     }
 
-    function changeSymbol() {
-        if (ws) {
-            ticksHistory = [];
-            toggleConnection();
-            toggleConnection();
-        }
-    }
-
-    function processTick(tick) {
-        const priceStr = tick.quote.toFixed(tick.pip_size);
-        const lastDigit = parseInt(priceStr.slice(-1));
-
-        document.getElementById("currentPrice").innerText = priceStr;
-        document.getElementById("lastDigit").innerText = lastDigit;
-
-        ticksHistory.push(lastDigit);
-        if (ticksHistory.length > maxTicks) ticksHistory.shift();
-
-        updateStats();
-    }
-
-    function updateStats() {
-        const counts = Array(10).fill(0);
-        ticksHistory.forEach(d => counts[d]++);
-
+    function updateGrid() {
         const grid = document.getElementById("digitsGrid");
         grid.innerHTML = "";
-
-        let maxCount = -1;
-        let bestDigit = 0;
-
-        counts.forEach((count, digit) => {
-            const percent = ((count / ticksHistory.length) * 100).toFixed(1);
-            if (count > maxCount) {
-                maxCount = count;
-                bestDigit = digit;
-            }
-
-            grid.innerHTML += `
-                <div class="digit-box">
-                    الرقم ${digit}
-                    <span>${percent}%</span>
-                </div>
-            `;
+        ticksHistory.forEach(digit => {
+            const box = document.createElement("div");
+            box.className = "digit-box";
+            box.innerText = digit;
+            grid.appendChild(box);
         });
-
-        if (ticksHistory.length >= 10) {
-            document.getElementById("predictionText").innerText = 
-                `الرقم الأكثر تكراراً: (${bestDigit}) بنسبة ${((maxCount/ticksHistory.length)*100).toFixed(0)}% [توقع Matches: ${bestDigit}]`;
-        }
     }
 </script>
+
 </body>
 </html>
