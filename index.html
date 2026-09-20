@@ -112,7 +112,7 @@
     </div>
 
     <div class="card">
-        <h3>تحليل الأرقام (آخر 50 Ticks)</h3>
+        <h3>تحليل الأرقام</h3>
         <div id="analysisResult">جاري تجهيز النظام...</div>
     </div>
 
@@ -149,9 +149,10 @@
             connBtn.innerText = "إيقاف التحليل";
             connBtn.classList.add('stop');
 
-            // إرسال الرمز الصحيح للمؤشر المطلوب
+            // إرسال الرمز مع تفعيل الاشتراك المباشر subscribe: 1
             ws.send(JSON.stringify({
-                ticks: symbol
+                ticks: symbol,
+                subscribe: 1
             }));
         };
 
@@ -172,12 +173,12 @@
 
                 document.getElementById('currentPrice').innerText = price;
                 document.getElementById('lastDigit').innerText = lastDigit;
-                document.getElementById('analysisResult').innerText = "تم استلام التيك بنجاح!";
+                document.getElementById('analysisResult').innerText = "تم استلام التيك بنجاح وتحديث الرقم!";
             }
         };
 
         ws.onerror = function (err) {
-            statusText.innerText = "حدث خطأ فـ الاتصال";
+            statusText.innerText = "حدث خطأ في الاتصال";
             statusText.style.color = "#ef4444";
             disconnect();
         };
