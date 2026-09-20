@@ -25,10 +25,7 @@
             max-width: 400px;
             text-align: center;
         }
-        h2 {
-            color: #38bdf8;
-            margin-bottom: 20px;
-        }
+        h2 { color: #38bdf8; margin-bottom: 20px; }
         select, button {
             width: 100%;
             padding: 12px;
@@ -38,38 +35,18 @@
             font-size: 16px;
             font-weight: bold;
         }
-        select {
-            background-color: #334155;
-            color: #ffffff;
-        }
-        button {
-            background-color: #22c55e;
-            color: #ffffff;
-            cursor: pointer;
-        }
-        button.stop {
-            background-color: #ef4444;
-        }
-        .status {
-            font-size: 14px;
-            margin: 10px 0;
-            color: #94a3b8;
-        }
+        select { background-color: #334155; color: #ffffff; }
+        button { background-color: #22c55e; color: #ffffff; cursor: pointer; }
+        button.stop { background-color: #ef4444; }
+        .status { font-size: 14px; margin: 10px 0; color: #94a3b8; }
         .card {
             background-color: #0f172a;
             padding: 15px;
             border-radius: 8px;
             margin-top: 15px;
         }
-        .price {
-            font-size: 24px;
-            color: #38bdf8;
-            font-weight: bold;
-        }
-        .digit {
-            font-size: 20px;
-            color: #f59e0b;
-        }
+        .price { font-size: 24px; color: #38bdf8; font-weight: bold; }
+        .digit { font-size: 20px; color: #f59e0b; }
         .error-log {
             background-color: #000;
             color: #f87171;
@@ -85,13 +62,22 @@
 
 <div class="container">
     <h2>Expert Analysis Tool V2</h2>
-    
+
     <select id="symbolSelect">
-        <option value="R_10">Volatility 10 Index</option>
-        <option value="R_25" selected>Volatility 25 Index</option>
-        <option value="R_50">Volatility 50 Index</option>
-        <option value="R_75">Volatility 75 Index</option>
-        <option value="R_100">Volatility 100 Index</option>
+        <optgroup label="Volatility">
+            <option value="R_10">Volatility 10 Index</option>
+            <option value="R_25" selected>Volatility 25 Index</option>
+            <option value="R_50">Volatility 50 Index</option>
+            <option value="R_75">Volatility 75 Index</option>
+            <option value="R_100">Volatility 100 Index</option>
+        </optgroup>
+        <optgroup label="Volatility (1s)">
+            <option value="1HZ10V">Volatility 10 (1s) Index</option>
+            <option value="1HZ25V">Volatility 25 (1s) Index</option>
+            <option value="1HZ50V">Volatility 50 (1s) Index</option>
+            <option value="1HZ75V">Volatility 75 (1s) Index</option>
+            <option value="1HZ100V">Volatility 100 (1s) Index</option>
+        </optgroup>
     </select>
 
     <button id="connBtn" onclick="toggleConnection()">بدء التحليل المباشر</button>
@@ -112,28 +98,43 @@
 </div>
 
 <script>
+    // عدّل هاد الرابط بعد ما ترفع الـ proxy:
+    // محلياً:  ws://localhost:3000
+    // على Render/Railway...:  wss://YOUR-PROXY-URL
+    const PROXY_URL = 'wss://YOUR-PROXY-URL';
+
     let ws = null;
     let isConnected = false;
     let currentSymbol = "R_25";
 
     function toggleConnection() {
-        if (isConnected) {
-            disconnect();
-        } else {
-            connect();
-        }
+        isConnected ? disconnect() : connect();
+    }
+
+    function resetUI(message) {
+        const connBtn = document.getElementById('connBtn');
+        connBtn.innerText = "بدء التحليل المباشر";
+        connBtn.classList.remove('stop');
+        document.getElementById('statusText').innerText = message;
+        document.getElementById('currentPrice').innerText = "---";
+        document.getElementById('lastDigit').innerText = "-";
+        document.getElementById('analysisResult').innerText = "جاري تجهيز النظام...";
+    }
+
+    function showError(text) {
+        const errorLog = document.getElementById('errorLog');
+        errorLog.style.display = 'block';
+        errorLog.innerText = text;
     }
 
     function connect() {
         const statusText = document.getElementById('statusText');
         const connBtn = document.getElementById('connBtn');
-        const errorLog = document.getElementById('errorLog');
+        document.getElementById('errorLog').style.display = 'none';
+        statusText.style.color = "#94a3b8";
+        statusText.innerText = "جاري الاتصال بالـ proxy...";
 
-        errorLog.style.display = 'none';
-        statusText.innerText = "جاري الاتصال بالسيرفر البديل...";
-
-        // الاتصال بالخادم المباشر الثاني لشركة Deriv لتجاوز حظر الرموز
-        ws = new WebSocket('wss://green.derivws.com/websockets/v3?app_id=1089');
+        ws = new WebSocket(PROXY_URL);
 
         ws.onopen = function () {
             isConnected = true;
@@ -148,10 +149,10 @@
 
         ws.onmessage = function (msg) {
             const data = JSON.parse(msg.data);
+            console.log(data); // للتشخيص: شوف شكل الرسائل الحقيقي من الـ API
 
             if (data.error) {
-                errorLog.style.display = 'block';
-                errorLog.innerText = "خطأ من السيرفر: " + data.error.message;
+                showError("خطأ من السيرفر: " + data.error.message);
                 return;
             }
 
@@ -167,52 +168,38 @@
         };
 
         ws.onerror = function () {
-            statusText.innerText = "خطأ في الاتصال بالسيرفر";
+            statusText.innerText = "خطأ في الاتصال بالـ proxy";
             statusText.style.color = "#ef4444";
         };
 
         ws.onclose = function () {
-            if (isConnected) {
-                statusText.innerText = "انقطع الاتصال";
-                statusText.style.color = "#ef4444";
-            }
+            const wasConnected = isConnected;
+            isConnected = false;
+            ws = null;
+            resetUI(wasConnected ? "انقطع الاتصال" : "تعذر الاتصال بالـ proxy");
+            document.getElementById('statusText').style.color = "#ef4444";
         };
     }
 
     function sendSubscription() {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        
-        // إلغاء أي اشتراك سابق لتجنب تداخل البيانات
         ws.send(JSON.stringify({ forget_all: "ticks" }));
-        
-        // إرسال طلب اشتراك جديد للرمز المحدد
-        ws.send(JSON.stringify({
-            ticks: currentSymbol,
-            subscribe: 1
-        }));
+        ws.send(JSON.stringify({ ticks: currentSymbol, subscribe: 1 }));
     }
 
-    document.getElementById('symbolSelect').addEventListener('change', function() {
+    document.getElementById('symbolSelect').addEventListener('change', function () {
         currentSymbol = this.value;
-        if (isConnected) {
-            sendSubscription();
-        }
+        if (isConnected) sendSubscription();
     });
 
     function disconnect() {
         if (ws) {
+            ws.onclose = null;
             ws.close();
             ws = null;
         }
         isConnected = false;
-        document.getElementById('statusText').innerText = "غير متصل بالحي";
-        document.getElementById('statusText').style.color = "#94a3b8";
-        const connBtn = document.getElementById('connBtn');
-        connBtn.innerText = "بدء التحليل المباشر";
-        connBtn.classList.remove('stop');
-        document.getElementById('currentPrice').innerText = "---";
-        document.getElementById('lastDigit').innerText = "-";
-        document.getElementById('analysisResult').innerText = "جاري تجهيز النظام...";
+        resetUI("غير متصل بالحي");
     }
 </script>
 
