@@ -35,6 +35,7 @@
   .strip span:last-child { background: #f59e0b; color: #000; font-weight: bold; }
   .note { font-size: 12px; color: #94a3b8; margin-top: 12px; line-height: 1.6; }
   .error-log { background: #000; color: #f87171; padding: 8px; border-radius: 5px; font-size: 12px; margin-top: 10px; word-break: break-all; display: none; }
+  .dbg { background: #000; color: #94a3b8; font: 11px monospace; direction: ltr; text-align: left; white-space: pre-wrap; word-break: break-all; padding: 8px; border-radius: 6px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -104,6 +105,7 @@
     ⚠️ هادي إحصائيات لما وقع فعلاً، ماشي توقعات. مؤشرات Deriv الاصطناعية كتولد الأرقام عشوائياً، فأي نمط كيبان ما كيضمن الرقم الجاي. ما تراهنش بفلوس ما تقدرش تخسرها.
   </div>
   <div id="errorLog" class="error-log"></div>
+  <div class="dbg" id="dbg">سجل التشخيص: فارغ</div>
 </div>
 
 <script>
@@ -112,14 +114,17 @@
   const MAX = 1000;
   const $ = (id) => document.getElementById(id);
 
-  let ws = null, mode = null, demoTimer = null, digits = [], pip = 2, demoPrice = 1000;
+  let ws = null, hws = null, mode = null, demoTimer = null;
+  let digits = [], pip = 2, pipKnown = false, demoPrice = 1000;
+  const dbg = [];
 
+  function log(t) { dbg.push(t); if (dbg.length > 12) dbg.shift(); $('dbg').textContent = dbg.join('\n'); }
   function setStatus(text, color) { $('statusText').textContent = text; $('statusText').style.color = color || '#94a3b8'; }
   function showError(t) { const e = $('errorLog'); e.style.display = 'block'; e.textContent = t; }
   function clearError() { $('errorLog').style.display = 'none'; }
 
   function pushDigit(price, p) {
-    if (typeof p === 'number') pip = p;
+    if (typeof p === 'number') { pip = p; pipKnown = true; }
     const s = Number(price).toFixed(pip);
     digits.push(Number(s.charAt(s.length - 1)));
     if (digits.length > MAX) digits.shift();
@@ -168,7 +173,7 @@
   }
 
   function resetStats() {
-    digits = [];
+    digits = []; pipKnown = false;
     $('price').textContent = '---';
     $('last').textContent = '-';
     render();
@@ -176,6 +181,7 @@
 
   function stopAll() {
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
+    if (hws) { hws.onclose = null; hws.onmessage = null; hws.close(); hws = null; }
     if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
     mode = null;
     $('liveBtn').textContent = 'بيانات مباشرة'; $('liveBtn').classList.remove('stop');
@@ -183,44 +189,74 @@
     setStatus('غير متصل');
   }
 
-  /* ---------- بيانات مباشرة من Deriv ---------- */
+  /* ---------- بيانات مباشرة من Deriv (بلا token) ---------- */
   function toggleLive() {
     if (mode === 'live') { stopAll(); return; }
-    stopAll(); resetStats(); clearError();
+    stopAll(); resetStats(); clearError(); dbg.length = 0;
     mode = 'live';
     setStatus('جاري الاتصال بـ Deriv...');
-    ws = new WebSocket(WS_URL);
-    ws.onopen = () => {
+    log('connecting: ' + WS_URL);
+    const sym = $('symbolSelect').value;
+    const sock = new WebSocket(WS_URL);
+    ws = sock;
+    let opened = false, msgCount = 0, gotTick = false;
+
+    sock.onopen = () => {
+      opened = true;
+      log('open OK');
       setStatus('متصل ✅ جاري جلب الأرقام...', '#22c55e');
       $('liveBtn').textContent = 'إيقاف'; $('liveBtn').classList.add('stop');
-      subscribe();
+      sock.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
+      log('sent: ticks ' + sym);
+      loadHistory(sym);
     };
-    ws.onmessage = (m) => {
-      const data = JSON.parse(m.data);
-      console.log(data);
-      if (data.error) {
-        const r = data.echo_req || {};
-        if (r.ticks_history || r.forget_all) return; // طلبات ثانوية، ما كتهمش
-        showError('خطأ من السيرفر: ' + data.error.message);
-        return;
+
+    sock.onmessage = (m) => {
+      if (msgCount++ < 3) log('msg: ' + String(m.data).slice(0, 110));
+      let data;
+      try { data = JSON.parse(m.data); } catch (e) { return; }
+      const err = data.error || (data.errors && data.errors[0]);
+      if (err) { showError('خطأ من السيرفر: ' + (err.message || JSON.stringify(err))); return; }
+      if (data.tick) {
+        const t = data.tick;
+        const q = t.quote !== undefined ? t.quote : (t.price !== undefined ? t.price : t.bid);
+        if (q !== undefined) {
+          onTick(q, t.pip_size);
+          if (!gotTick) { gotTick = true; setStatus('متصل ✅ الأرقام كتوصل', '#22c55e'); }
+        }
       }
-      if (data.history && data.history.prices) {
-        const p = typeof data.pip_size === 'number' ? data.pip_size : undefined;
-        data.history.prices.forEach((x) => pushDigit(x, p));
-        render();
-      }
-      if (data.tick) onTick(data.tick.quote, data.tick.pip_size);
     };
-    ws.onerror = () => setStatus('خطأ في الاتصال بـ Deriv', '#ef4444');
-    ws.onclose = () => { const was = mode === 'live'; stopAll(); if (was) setStatus('انقطع الاتصال', '#ef4444'); };
+
+    sock.onerror = () => log('error event');
+    sock.onclose = (e) => {
+      log('close code=' + e.code + ' reason=' + (e.reason || '-') + ' opened=' + opened);
+      if (ws !== sock) return;
+      stopAll();
+      setStatus(opened ? 'انقطع الاتصال' : 'تعذر الاتصال بـ Deriv', '#ef4444');
+    };
   }
 
-  function subscribe() {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    const sym = $('symbolSelect').value;
-    ws.send(JSON.stringify({ forget_all: 'ticks' }));
-    ws.send(JSON.stringify({ ticks_history: sym, count: 500, end: 'latest', style: 'ticks' }));
-    ws.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
+  // التاريخ كيتجلب فاتصال منفصل، باش إلا فشل ما يوقفش الأرقام المباشرة
+  function loadHistory(sym) {
+    const h = new WebSocket(WS_URL);
+    hws = h;
+    h.onopen = () => h.send(JSON.stringify({ ticks_history: sym, count: 500, end: 'latest', style: 'ticks' }));
+    h.onmessage = (m) => {
+      log('history: ' + String(m.data).slice(0, 80));
+      let d;
+      try { d = JSON.parse(m.data); } catch (e) { return; }
+      if (d.history && d.history.prices && mode === 'live') {
+        const p = typeof d.pip_size === 'number' ? d.pip_size : (pipKnown ? pip : null);
+        if (p === null) { log('history skipped: pip unknown'); }
+        else {
+          digits = [];
+          d.history.prices.forEach((x) => pushDigit(x, p));
+          render();
+        }
+      }
+      h.onclose = null; h.close(); if (hws === h) hws = null;
+    };
+    h.onerror = () => log('history error');
   }
 
   /* ---------- وضع تجريبي (أرقام عشوائية للتجربة فقط) ---------- */
@@ -236,7 +272,10 @@
     }, 400);
   }
 
-  $('symbolSelect').addEventListener('change', () => { resetStats(); if (mode === 'live') subscribe(); });
+  $('symbolSelect').addEventListener('change', () => {
+    resetStats();
+    if (mode === 'live') { stopAll(); toggleLive(); }
+  });
   $('win').addEventListener('change', render);
   render();
 </script>
