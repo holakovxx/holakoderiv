@@ -107,8 +107,8 @@
 </div>
 
 <script>
-  // رابط النادل (Cloudflare Worker). خدام غير بعد ما تلصق فيه worker.js
-  const PROXY_URL = 'wss://deriv-proxy.zobabzb.workers.dev';
+  // رابط Deriv العمومي: بلا token وبلا نادل
+  const WS_URL = 'wss://api.derivws.com/trading/v1/options/ws/public';
   const MAX = 1000;
   const $ = (id) => document.getElementById(id);
 
@@ -183,13 +183,13 @@
     setStatus('غير متصل');
   }
 
-  /* ---------- بيانات مباشرة عبر النادل ---------- */
+  /* ---------- بيانات مباشرة من Deriv ---------- */
   function toggleLive() {
     if (mode === 'live') { stopAll(); return; }
     stopAll(); resetStats(); clearError();
     mode = 'live';
-    setStatus('جاري الاتصال بالنادل...');
-    ws = new WebSocket(PROXY_URL);
+    setStatus('جاري الاتصال بـ Deriv...');
+    ws = new WebSocket(WS_URL);
     ws.onopen = () => {
       setStatus('متصل ✅ جاري جلب الأرقام...', '#22c55e');
       $('liveBtn').textContent = 'إيقاف'; $('liveBtn').classList.add('stop');
@@ -198,7 +198,12 @@
     ws.onmessage = (m) => {
       const data = JSON.parse(m.data);
       console.log(data);
-      if (data.error) { showError('خطأ من السيرفر: ' + data.error.message); return; }
+      if (data.error) {
+        const r = data.echo_req || {};
+        if (r.ticks_history || r.forget_all) return; // طلبات ثانوية، ما كتهمش
+        showError('خطأ من السيرفر: ' + data.error.message);
+        return;
+      }
       if (data.history && data.history.prices) {
         const p = typeof data.pip_size === 'number' ? data.pip_size : undefined;
         data.history.prices.forEach((x) => pushDigit(x, p));
@@ -206,7 +211,7 @@
       }
       if (data.tick) onTick(data.tick.quote, data.tick.pip_size);
     };
-    ws.onerror = () => setStatus('خطأ في الاتصال بالنادل', '#ef4444');
+    ws.onerror = () => setStatus('خطأ في الاتصال بـ Deriv', '#ef4444');
     ws.onclose = () => { const was = mode === 'live'; stopAll(); if (was) setStatus('انقطع الاتصال', '#ef4444'); };
   }
 
