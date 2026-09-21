@@ -1,207 +1,239 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expert Analysis Tool - Deriv V2</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #0f172a;
-            color: #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 15px;
-        }
-        .container {
-            background-color: #1e293b;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-        h2 { color: #38bdf8; margin-bottom: 20px; }
-        select, button {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            border-radius: 8px;
-            border: none;
-            font-size: 16px;
-            font-weight: bold;
-        }
-        select { background-color: #334155; color: #ffffff; }
-        button { background-color: #22c55e; color: #ffffff; cursor: pointer; }
-        button.stop { background-color: #ef4444; }
-        .status { font-size: 14px; margin: 10px 0; color: #94a3b8; }
-        .card {
-            background-color: #0f172a;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-        }
-        .price { font-size: 24px; color: #38bdf8; font-weight: bold; }
-        .digit { font-size: 20px; color: #f59e0b; }
-        .error-log {
-            background-color: #000;
-            color: #f87171;
-            padding: 8px;
-            border-radius: 5px;
-            font-size: 12px;
-            margin-top: 10px;
-            word-break: break-all;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>محلل الأرقام الأخيرة - Deriv</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; background: #0f172a; color: #fff; margin: 0; padding: 15px; display: flex; justify-content: center; }
+  .container { background: #1e293b; padding: 18px; border-radius: 12px; width: 100%; max-width: 420px; box-shadow: 0 4px 15px rgba(0,0,0,.5); }
+  h2 { color: #38bdf8; margin: 0 0 14px; text-align: center; }
+  select, button { width: 100%; padding: 11px; margin: 5px 0; border-radius: 8px; border: none; font-size: 15px; font-weight: bold; }
+  select { background: #334155; color: #fff; }
+  .row { display: flex; gap: 8px; }
+  button { color: #fff; cursor: pointer; }
+  #liveBtn { background: #22c55e; } #demoBtn { background: #6366f1; }
+  button.stop { background: #ef4444 !important; }
+  .status { font-size: 13px; margin: 8px 0; color: #94a3b8; text-align: center; }
+  .card { background: #0f172a; padding: 14px; border-radius: 8px; margin-top: 12px; text-align: center; }
+  .card h3 { margin: 0 0 10px; font-size: 15px; color: #cbd5e1; }
+  .price { font-size: 24px; color: #38bdf8; font-weight: bold; }
+  .digit { font-size: 22px; color: #f59e0b; font-weight: bold; }
+  .bars { position: relative; height: 120px; display: flex; align-items: flex-end; gap: 4px; direction: ltr; border-bottom: 1px solid #334155; }
+  .bar { flex: 1; background: #38bdf8; border-radius: 4px 4px 0 0; min-height: 2px; transition: height .25s; }
+  .bar.hi { background: #22c55e; } .bar.lo { background: #ef4444; }
+  .line10 { position: absolute; left: 0; right: 0; bottom: 50px; border-top: 1px dashed #64748b; }
+  .labels { display: flex; gap: 4px; direction: ltr; margin-top: 4px; }
+  .labels div { flex: 1; font-size: 11px; color: #94a3b8; }
+  .labels b { display: block; font-size: 14px; color: #fff; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+  .grid div { background: #1e293b; padding: 8px; border-radius: 6px; }
+  .grid b { display: block; font-size: 16px; color: #f59e0b; margin-top: 2px; }
+  .strip { direction: ltr; display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+  .strip span { width: 24px; height: 24px; line-height: 24px; border-radius: 50%; background: #334155; font-size: 13px; }
+  .strip span:last-child { background: #f59e0b; color: #000; font-weight: bold; }
+  .note { font-size: 12px; color: #94a3b8; margin-top: 12px; line-height: 1.6; }
+  .error-log { background: #000; color: #f87171; padding: 8px; border-radius: 5px; font-size: 12px; margin-top: 10px; word-break: break-all; display: none; }
+</style>
 </head>
 <body>
-
 <div class="container">
-    <h2>Expert Analysis Tool V2</h2>
+  <h2>محلل الأرقام الأخيرة</h2>
 
-    <select id="symbolSelect">
-        <optgroup label="Volatility">
-            <option value="R_10">Volatility 10 Index</option>
-            <option value="R_25" selected>Volatility 25 Index</option>
-            <option value="R_50">Volatility 50 Index</option>
-            <option value="R_75">Volatility 75 Index</option>
-            <option value="R_100">Volatility 100 Index</option>
-        </optgroup>
-        <optgroup label="Volatility (1s)">
-            <option value="1HZ10V">Volatility 10 (1s) Index</option>
-            <option value="1HZ25V">Volatility 25 (1s) Index</option>
-            <option value="1HZ50V">Volatility 50 (1s) Index</option>
-            <option value="1HZ75V">Volatility 75 (1s) Index</option>
-            <option value="1HZ100V">Volatility 100 (1s) Index</option>
-        </optgroup>
-    </select>
+  <select id="symbolSelect">
+    <optgroup label="Volatility">
+      <option value="R_10">Volatility 10</option>
+      <option value="R_25" selected>Volatility 25</option>
+      <option value="R_50">Volatility 50</option>
+      <option value="R_75">Volatility 75</option>
+      <option value="R_100">Volatility 100</option>
+    </optgroup>
+    <optgroup label="Volatility (1s)">
+      <option value="1HZ10V">Volatility 10 (1s)</option>
+      <option value="1HZ25V">Volatility 25 (1s)</option>
+      <option value="1HZ50V">Volatility 50 (1s)</option>
+      <option value="1HZ75V">Volatility 75 (1s)</option>
+      <option value="1HZ100V">Volatility 100 (1s)</option>
+    </optgroup>
+  </select>
 
-    <button id="connBtn" onclick="toggleConnection()">بدء التحليل المباشر</button>
-    <div class="status" id="statusText">غير متصل بالحي</div>
+  <select id="win">
+    <option value="100">آخر 100 تيك</option>
+    <option value="300">آخر 300 تيك</option>
+    <option value="500" selected>آخر 500 تيك</option>
+    <option value="1000">آخر 1000 تيك</option>
+  </select>
 
-    <div class="card">
-        <div>السعر الحالي</div>
-        <div class="price" id="currentPrice">---</div>
-        <div style="margin-top: 10px;">آخر رقم (Last Digit): <span class="digit" id="lastDigit">-</span></div>
+  <div class="row">
+    <button id="liveBtn" onclick="toggleLive()">بيانات مباشرة</button>
+    <button id="demoBtn" onclick="toggleDemo()">وضع تجريبي</button>
+  </div>
+  <div class="status" id="statusText">غير متصل</div>
+
+  <div class="card">
+    <div>السعر الحالي</div>
+    <div class="price" id="price">---</div>
+    <div style="margin-top:8px">آخر رقم: <span class="digit" id="last">-</span></div>
+  </div>
+
+  <div class="card">
+    <h3>توزيع الأرقام (<span id="count">0</span> تيك)</h3>
+    <div class="bars" id="bars"><div class="line10"></div></div>
+    <div class="labels" id="labels"></div>
+    <div style="font-size:11px;color:#64748b;margin-top:6px">الخط المتقطع = 10% (التوزيع المتساوي)</div>
+  </div>
+
+  <div class="card">
+    <h3>إحصائيات سريعة</h3>
+    <div class="grid">
+      <div>الأكثر ظهوراً<b id="mostD">-</b></div>
+      <div>الأقل ظهوراً<b id="leastD">-</b></div>
+      <div>زوجي / فردي<b id="evenOdd">-</b></div>
+      <div>5+ / أقل من 5<b id="overUnder">-</b></div>
+      <div style="grid-column:span 2">التكرار الحالي لنفس الرقم<b id="streak">-</b></div>
     </div>
+  </div>
 
-    <div class="card">
-        <h3>تحليل الأرقام</h3>
-        <div id="analysisResult">جاري تجهيز النظام...</div>
-    </div>
+  <div class="card">
+    <h3>آخر 15 رقم</h3>
+    <div class="strip" id="strip"></div>
+  </div>
 
-    <div id="errorLog" class="error-log" style="display:none;"></div>
+  <div class="note">
+    ⚠️ هادي إحصائيات لما وقع فعلاً، ماشي توقعات. مؤشرات Deriv الاصطناعية كتولد الأرقام عشوائياً، فأي نمط كيبان ما كيضمن الرقم الجاي. ما تراهنش بفلوس ما تقدرش تخسرها.
+  </div>
+  <div id="errorLog" class="error-log"></div>
 </div>
 
 <script>
-    // عدّل هاد الرابط بعد ما ترفع الـ proxy:
-    // محلياً:  ws://localhost:3000
-    // على Render/Railway...:  wss://YOUR-PROXY-URL
-    const PROXY_URL = 'wss://YOUR-PROXY-URL';
+  // رابط النادل (Cloudflare Worker). خدام غير بعد ما تلصق فيه worker.js
+  const PROXY_URL = 'wss://deriv-proxy.zobabzb.workers.dev';
+  const MAX = 1000;
+  const $ = (id) => document.getElementById(id);
 
-    let ws = null;
-    let isConnected = false;
-    let currentSymbol = "R_25";
+  let ws = null, mode = null, demoTimer = null, digits = [], pip = 2, demoPrice = 1000;
 
-    function toggleConnection() {
-        isConnected ? disconnect() : connect();
+  function setStatus(text, color) { $('statusText').textContent = text; $('statusText').style.color = color || '#94a3b8'; }
+  function showError(t) { const e = $('errorLog'); e.style.display = 'block'; e.textContent = t; }
+  function clearError() { $('errorLog').style.display = 'none'; }
+
+  function pushDigit(price, p) {
+    if (typeof p === 'number') pip = p;
+    const s = Number(price).toFixed(pip);
+    digits.push(Number(s.charAt(s.length - 1)));
+    if (digits.length > MAX) digits.shift();
+    return s;
+  }
+
+  function onTick(price, p) {
+    const s = pushDigit(price, p);
+    $('price').textContent = s;
+    $('last').textContent = digits[digits.length - 1];
+    render();
+  }
+
+  function render() {
+    const n = Number($('win').value);
+    const w = digits.slice(-n), total = w.length;
+    const counts = Array(10).fill(0);
+    w.forEach((d) => counts[d]++);
+    const max = Math.max(...counts), min = Math.min(...counts);
+    const mark = total >= 30 && max > min;
+
+    let bars = '<div class="line10"></div>', labels = '';
+    for (let i = 0; i < 10; i++) {
+      const pct = total ? (counts[i] / total) * 100 : 0;
+      const cls = mark && counts[i] === max ? 'hi' : mark && counts[i] === min ? 'lo' : '';
+      bars += `<div class="bar ${cls}" style="height:${Math.min(pct * 5, 118)}px"></div>`;
+      labels += `<div><b>${i}</b>${pct.toFixed(1)}%</div>`;
     }
+    $('bars').innerHTML = bars;
+    $('labels').innerHTML = labels;
+    $('count').textContent = total;
 
-    function resetUI(message) {
-        const connBtn = document.getElementById('connBtn');
-        connBtn.innerText = "بدء التحليل المباشر";
-        connBtn.classList.remove('stop');
-        document.getElementById('statusText').innerText = message;
-        document.getElementById('currentPrice').innerText = "---";
-        document.getElementById('lastDigit').innerText = "-";
-        document.getElementById('analysisResult').innerText = "جاري تجهيز النظام...";
+    if (total) {
+      $('mostD').textContent = counts.indexOf(max) + ' (' + ((max / total) * 100).toFixed(1) + '%)';
+      $('leastD').textContent = counts.indexOf(min) + ' (' + ((min / total) * 100).toFixed(1) + '%)';
+      const even = w.filter((d) => d % 2 === 0).length, over = w.filter((d) => d >= 5).length;
+      $('evenOdd').textContent = ((even / total) * 100).toFixed(0) + '% / ' + (100 - (even / total) * 100).toFixed(0) + '%';
+      $('overUnder').textContent = ((over / total) * 100).toFixed(0) + '% / ' + (100 - (over / total) * 100).toFixed(0) + '%';
+      let s = 1;
+      for (let i = digits.length - 2; i >= 0 && digits[i] === digits[digits.length - 1]; i--) s++;
+      $('streak').textContent = s + ' × (الرقم ' + digits[digits.length - 1] + ')';
+    } else {
+      ['mostD', 'leastD', 'evenOdd', 'overUnder', 'streak'].forEach((id) => ($(id).textContent = '-'));
     }
+    $('strip').innerHTML = digits.slice(-15).map((d) => `<span>${d}</span>`).join('');
+  }
 
-    function showError(text) {
-        const errorLog = document.getElementById('errorLog');
-        errorLog.style.display = 'block';
-        errorLog.innerText = text;
-    }
+  function resetStats() {
+    digits = [];
+    $('price').textContent = '---';
+    $('last').textContent = '-';
+    render();
+  }
 
-    function connect() {
-        const statusText = document.getElementById('statusText');
-        const connBtn = document.getElementById('connBtn');
-        document.getElementById('errorLog').style.display = 'none';
-        statusText.style.color = "#94a3b8";
-        statusText.innerText = "جاري الاتصال بالـ proxy...";
+  function stopAll() {
+    if (ws) { ws.onclose = null; ws.close(); ws = null; }
+    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+    mode = null;
+    $('liveBtn').textContent = 'بيانات مباشرة'; $('liveBtn').classList.remove('stop');
+    $('demoBtn').textContent = 'وضع تجريبي'; $('demoBtn').classList.remove('stop');
+    setStatus('غير متصل');
+  }
 
-        ws = new WebSocket(PROXY_URL);
+  /* ---------- بيانات مباشرة عبر النادل ---------- */
+  function toggleLive() {
+    if (mode === 'live') { stopAll(); return; }
+    stopAll(); resetStats(); clearError();
+    mode = 'live';
+    setStatus('جاري الاتصال بالنادل...');
+    ws = new WebSocket(PROXY_URL);
+    ws.onopen = () => {
+      setStatus('متصل ✅ جاري جلب الأرقام...', '#22c55e');
+      $('liveBtn').textContent = 'إيقاف'; $('liveBtn').classList.add('stop');
+      subscribe();
+    };
+    ws.onmessage = (m) => {
+      const data = JSON.parse(m.data);
+      console.log(data);
+      if (data.error) { showError('خطأ من السيرفر: ' + data.error.message); return; }
+      if (data.history && data.history.prices) {
+        const p = typeof data.pip_size === 'number' ? data.pip_size : undefined;
+        data.history.prices.forEach((x) => pushDigit(x, p));
+        render();
+      }
+      if (data.tick) onTick(data.tick.quote, data.tick.pip_size);
+    };
+    ws.onerror = () => setStatus('خطأ في الاتصال بالنادل', '#ef4444');
+    ws.onclose = () => { const was = mode === 'live'; stopAll(); if (was) setStatus('انقطع الاتصال', '#ef4444'); };
+  }
 
-        ws.onopen = function () {
-            isConnected = true;
-            statusText.innerText = "متصل بنجاح - جلب البيانات...";
-            statusText.style.color = "#22c55e";
-            connBtn.innerText = "إيقاف التحليل";
-            connBtn.classList.add('stop');
+  function subscribe() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const sym = $('symbolSelect').value;
+    ws.send(JSON.stringify({ forget_all: 'ticks' }));
+    ws.send(JSON.stringify({ ticks_history: sym, count: 500, end: 'latest', style: 'ticks' }));
+    ws.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
+  }
 
-            currentSymbol = document.getElementById('symbolSelect').value;
-            sendSubscription();
-        };
+  /* ---------- وضع تجريبي (أرقام عشوائية للتجربة فقط) ---------- */
+  function toggleDemo() {
+    if (mode === 'demo') { stopAll(); return; }
+    stopAll(); resetStats(); clearError();
+    mode = 'demo';
+    $('demoBtn').textContent = 'إيقاف'; $('demoBtn').classList.add('stop');
+    setStatus('وضع تجريبي: أرقام عشوائية مولّدة عندي، ماشي من Deriv', '#f59e0b');
+    demoTimer = setInterval(() => {
+      demoPrice += (Math.random() - 0.5) * 2;
+      onTick(demoPrice, 2);
+    }, 400);
+  }
 
-        ws.onmessage = function (msg) {
-            const data = JSON.parse(msg.data);
-            console.log(data); // للتشخيص: شوف شكل الرسائل الحقيقي من الـ API
-
-            if (data.error) {
-                showError("خطأ من السيرفر: " + data.error.message);
-                return;
-            }
-
-            if (data.tick) {
-                const price = data.tick.quote;
-                const priceStr = price.toFixed(data.tick.pip_size || 2);
-                const lastDigit = priceStr.charAt(priceStr.length - 1);
-
-                document.getElementById('currentPrice').innerText = priceStr;
-                document.getElementById('lastDigit').innerText = lastDigit;
-                document.getElementById('analysisResult').innerText = "تم استلام السعر وتحديث Last Digit بنجاح.";
-            }
-        };
-
-        ws.onerror = function () {
-            statusText.innerText = "خطأ في الاتصال بالـ proxy";
-            statusText.style.color = "#ef4444";
-        };
-
-        ws.onclose = function () {
-            const wasConnected = isConnected;
-            isConnected = false;
-            ws = null;
-            resetUI(wasConnected ? "انقطع الاتصال" : "تعذر الاتصال بالـ proxy");
-            document.getElementById('statusText').style.color = "#ef4444";
-        };
-    }
-
-    function sendSubscription() {
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        ws.send(JSON.stringify({ forget_all: "ticks" }));
-        ws.send(JSON.stringify({ ticks: currentSymbol, subscribe: 1 }));
-    }
-
-    document.getElementById('symbolSelect').addEventListener('change', function () {
-        currentSymbol = this.value;
-        if (isConnected) sendSubscription();
-    });
-
-    function disconnect() {
-        if (ws) {
-            ws.onclose = null;
-            ws.close();
-            ws = null;
-        }
-        isConnected = false;
-        resetUI("غير متصل بالحي");
-    }
+  $('symbolSelect').addEventListener('change', () => { resetStats(); if (mode === 'live') subscribe(); });
+  $('win').addEventListener('change', render);
+  render();
 </script>
-
 </body>
 </html>
