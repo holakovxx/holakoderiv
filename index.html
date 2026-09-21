@@ -1,181 +1,287 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>محلل الأرقام الأخيرة - Deriv</title>
+<title>Expert Analysis Tool</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; background: #0f172a; color: #fff; margin: 0; padding: 15px; display: flex; justify-content: center; }
-  .container { background: #1e293b; padding: 18px; border-radius: 12px; width: 100%; max-width: 420px; box-shadow: 0 4px 15px rgba(0,0,0,.5); }
-  h2 { color: #38bdf8; margin: 0 0 14px; text-align: center; }
-  select, button { width: 100%; padding: 11px; margin: 5px 0; border-radius: 8px; border: none; font-size: 15px; font-weight: bold; }
-  select { background: #334155; color: #fff; }
-  .row { display: flex; gap: 8px; }
-  button { color: #fff; cursor: pointer; }
-  #liveBtn { background: #22c55e; } #demoBtn { background: #6366f1; }
-  button.stop { background: #ef4444 !important; }
-  .status { font-size: 13px; margin: 8px 0; color: #94a3b8; text-align: center; }
-  .card { background: #0f172a; padding: 14px; border-radius: 8px; margin-top: 12px; text-align: center; }
-  .card h3 { margin: 0 0 10px; font-size: 15px; color: #cbd5e1; }
-  .price { font-size: 24px; color: #38bdf8; font-weight: bold; }
-  .digit { font-size: 22px; color: #f59e0b; font-weight: bold; }
-  .bars { position: relative; height: 120px; display: flex; align-items: flex-end; gap: 4px; direction: ltr; border-bottom: 1px solid #334155; }
+  body { margin: 0; padding: 12px; font-family: Inter, Arial, Helvetica, sans-serif; background: #fff; color: #0f172a; display: flex; justify-content: center; }
+  .wrap { width: 100%; max-width: 430px; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 14px; border-bottom: 1px solid #e2e8f0; margin-bottom: 14px; }
+  h1 { font-size: 18px; margin: 0; } h1 span { color: #059669; }
+  #menuBtn { background: none; border: none; font-size: 24px; cursor: pointer; color: #334155; padding: 0 4px; }
+  h2 { font-size: 30px; margin: 6px 0 4px; letter-spacing: -.5px; }
+  .sub { color: #64748b; font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+  .lab { font-size: 11px; letter-spacing: .8px; color: #64748b; margin: 10px 0 4px; text-transform: uppercase; }
+  select { width: 100%; padding: 13px 12px; border-radius: 12px; border: 1px solid #e2e8f0; font-size: 15px; background: #fff; color: #0f172a; }
+  .panel { border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; margin-top: 16px; box-shadow: 0 2px 12px rgba(15,23,42,.05); }
+  .symname { text-align: center; font-size: 13px; color: #475569; }
+  .price { text-align: center; font-size: 40px; font-weight: bold; color: #059669; margin: 2px 0; letter-spacing: -1px; }
+  .live { text-align: center; font-size: 12px; font-weight: bold; color: #64748b; margin-bottom: 14px; }
+  .live.on { color: #059669; } .live.bad { color: #dc2626; }
+  .live.on::before { content: "● "; }
+  button { border: none; cursor: pointer; font-weight: bold; }
+  .main { width: 100%; background: #0f172a; color: #fff; border-radius: 12px; padding: 15px; font-size: 14px; letter-spacing: 1px; }
+  h3 { font-size: 20px; margin: 22px 0 12px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid button { color: #fff; padding: 14px 4px; border-radius: 12px; font-size: 14px; opacity: .78; }
+  .grid button.sel { opacity: 1; outline: 3px solid #c7d2fe; }
+  .stratTxt { font-size: 13px; color: #334155; margin-top: 12px; line-height: 1.5; }
+  .track { height: 8px; background: #e2e8f0; border-radius: 6px; margin-top: 8px; overflow: hidden; }
+  .fill { height: 100%; background: #7c3aed; width: 0; transition: width .3s; }
+  .ai { border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; margin-top: 22px; box-shadow: 0 2px 12px rgba(15,23,42,.05); }
+  .ai h4 { margin: 0 0 12px; font-size: 16px; color: #4c1d95; display: flex; align-items: center; gap: 8px; }
+  .ico { width: 26px; height: 26px; border-radius: 8px; background: #ede9fe; color: #6d28d9; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+  .item { background: #f8fafc; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .item .k { font-size: 11px; color: #64748b; margin-bottom: 4px; } .item .v { font-size: 17px; font-weight: bold; }
+  .item .t { font-size: 13px; line-height: 1.5; color: #334155; }
+  .duo { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 16px; }
+  .pill { background: linear-gradient(#0ea5e9, #2563eb); border-radius: 24px; padding: 13px 6px; text-align: center; width: 104px; font-size: 14px; font-weight: bold; color: #fff; opacity: .8; }
+  .pill.sel { opacity: 1; outline: 3px solid #bae6fd; }
+  .pill small { display: block; font-weight: normal; font-size: 11px; margin-top: 2px; opacity: .9; }
+  .circle { width: 88px; height: 88px; border-radius: 50%; background: linear-gradient(#a855f7, #7c3aed); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 38px; font-weight: bold; margin: 0 auto; box-shadow: 0 6px 16px rgba(124,58,237,.35); }
+  .cap { text-align: center; font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.5; }
+  .bars { position: relative; height: 110px; display: flex; align-items: flex-end; gap: 4px; border-bottom: 1px solid #cbd5e1; }
   .bar { flex: 1; background: #38bdf8; border-radius: 4px 4px 0 0; min-height: 2px; transition: height .25s; }
   .bar.hi { background: #22c55e; } .bar.lo { background: #ef4444; }
-  .line10 { position: absolute; left: 0; right: 0; bottom: 50px; border-top: 1px dashed #64748b; }
-  .labels { display: flex; gap: 4px; direction: ltr; margin-top: 4px; }
-  .labels div { flex: 1; font-size: 11px; color: #94a3b8; }
-  .labels b { display: block; font-size: 14px; color: #fff; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
-  .grid div { background: #1e293b; padding: 8px; border-radius: 6px; }
-  .grid b { display: block; font-size: 16px; color: #f59e0b; margin-top: 2px; }
-  .strip { direction: ltr; display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
-  .strip span { width: 24px; height: 24px; line-height: 24px; border-radius: 50%; background: #334155; font-size: 13px; }
-  .strip span:last-child { background: #f59e0b; color: #000; font-weight: bold; }
-  .note { font-size: 12px; color: #94a3b8; margin-top: 12px; line-height: 1.6; }
-  .error-log { background: #000; color: #f87171; padding: 8px; border-radius: 5px; font-size: 12px; margin-top: 10px; word-break: break-all; display: none; }
-  .dbg { background: #000; color: #94a3b8; font: 11px monospace; direction: ltr; text-align: left; white-space: pre-wrap; word-break: break-all; padding: 8px; border-radius: 6px; margin-top: 10px; }
+  .line10 { position: absolute; left: 0; right: 0; bottom: 50px; border-top: 1px dashed #94a3b8; }
+  .labels { display: flex; gap: 4px; margin-top: 4px; text-align: center; }
+  .labels div { flex: 1; font-size: 10px; color: #64748b; } .labels b { display: block; font-size: 13px; color: #0f172a; }
+  .strip { display: flex; flex-wrap: wrap; gap: 4px; }
+  .strip span { width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%; background: #e2e8f0; font-size: 13px; }
+  .strip span:last-child { background: #f59e0b; color: #fff; font-weight: bold; }
+  .note { font-size: 12px; color: #64748b; line-height: 1.6; margin-top: 16px; }
+  .err { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 8px; font-size: 12px; margin-top: 12px; display: none; word-break: break-all; }
+  #menu { display: none; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; margin-bottom: 14px; background: #f8fafc; }
+  #menu button.link { background: none; color: #6366f1; font-size: 13px; padding: 10px 0; }
+  pre { white-space: pre-wrap; word-break: break-all; font-size: 11px; color: #64748b; margin: 6px 0 0; }
+  footer { margin: 26px 0 8px; font-size: 13px; color: #64748b; line-height: 1.5; }
+  footer b { color: #0f172a; }
 </style>
 </head>
 <body>
-<div class="container">
-  <h2>محلل الأرقام الأخيرة</h2>
+<div class="wrap">
+  <header>
+    <h1>Expert Analysis <span>Tool</span></h1>
+    <button id="menuBtn" aria-label="Menu">☰</button>
+  </header>
 
+  <div id="menu">
+    <div class="lab" style="margin-top:0">Sample size</div>
+    <select id="win">
+      <option value="100">Last 100 ticks</option>
+      <option value="300">Last 300 ticks</option>
+      <option value="500" selected>Last 500 ticks</option>
+      <option value="1000">Last 1000 ticks</option>
+    </select>
+    <button class="link" id="demoBtn" onclick="toggleDemo()">Try demo mode (fake random data)</button>
+    <div class="lab">Diagnostics</div>
+    <pre id="dbg">-</pre>
+  </div>
+
+  <h2>Live Dashboard</h2>
+  <div class="sub">Pick a market and strategy, then start analysis for a live read.</div>
+
+  <div class="lab">Contract type</div>
+  <select id="contract">
+    <option value="matches" selected>Matches</option>
+    <option value="differs">Differs</option>
+  </select>
+
+  <div class="lab">Volatility</div>
   <select id="symbolSelect">
     <optgroup label="Volatility">
-      <option value="R_10">Volatility 10</option>
-      <option value="R_25" selected>Volatility 25</option>
-      <option value="R_50">Volatility 50</option>
-      <option value="R_75">Volatility 75</option>
-      <option value="R_100">Volatility 100</option>
+      <option value="R_10">Volatility 10 Index</option>
+      <option value="R_25" selected>Volatility 25 Index</option>
+      <option value="R_50">Volatility 50 Index</option>
+      <option value="R_75">Volatility 75 Index</option>
+      <option value="R_100">Volatility 100 Index</option>
     </optgroup>
     <optgroup label="Volatility (1s)">
-      <option value="1HZ10V">Volatility 10 (1s)</option>
-      <option value="1HZ25V">Volatility 25 (1s)</option>
-      <option value="1HZ50V">Volatility 50 (1s)</option>
-      <option value="1HZ75V">Volatility 75 (1s)</option>
-      <option value="1HZ100V">Volatility 100 (1s)</option>
+      <option value="1HZ10V">Volatility 10 (1s) Index</option>
+      <option value="1HZ25V">Volatility 25 (1s) Index</option>
+      <option value="1HZ50V">Volatility 50 (1s) Index</option>
+      <option value="1HZ75V">Volatility 75 (1s) Index</option>
+      <option value="1HZ100V">Volatility 100 (1s) Index</option>
     </optgroup>
   </select>
 
-  <select id="win">
-    <option value="100">آخر 100 تيك</option>
-    <option value="300">آخر 300 تيك</option>
-    <option value="500" selected>آخر 500 تيك</option>
-    <option value="1000">آخر 1000 تيك</option>
-  </select>
-
-  <div class="row">
-    <button id="liveBtn" onclick="toggleLive()">بيانات مباشرة</button>
-    <button id="demoBtn" onclick="toggleDemo()">وضع تجريبي</button>
-  </div>
-  <div class="status" id="statusText">غير متصل</div>
-
-  <div class="card">
-    <div>السعر الحالي</div>
+  <div class="panel">
+    <div class="symname" id="symName">Volatility 25 Index</div>
     <div class="price" id="price">---</div>
-    <div style="margin-top:8px">آخر رقم: <span class="digit" id="last">-</span></div>
+    <div class="live" id="liveTxt">Disconnected</div>
+    <button class="main" id="liveBtn" onclick="toggleLive()">START ANALYSIS</button>
   </div>
 
-  <div class="card">
-    <h3>توزيع الأرقام (<span id="count">0</span> تيك)</h3>
-    <div class="bars" id="bars"><div class="line10"></div></div>
-    <div class="labels" id="labels"></div>
-    <div style="font-size:11px;color:#64748b;margin-top:6px">الخط المتقطع = 10% (التوزيع المتساوي)</div>
+  <h3>Strategy Selector</h3>
+  <div class="grid" id="strats">
+    <button data-s="even" style="background:#3b82f6" class="sel">Even</button>
+    <button data-s="odd" style="background:#a855f7">Odd</button>
+    <button data-s="over" style="background:#22c55e">Over 4</button>
+    <button data-s="under" style="background:#f97316">Under 5</button>
+    <button data-s="rise" style="background:#14b8a6">Rise</button>
+    <button data-s="fall" style="background:#f43f5e">Fall</button>
   </div>
+  <div class="stratTxt" id="stratTxt">-</div>
+  <div class="track"><div class="fill" id="stratFill"></div></div>
 
-  <div class="card">
-    <h3>إحصائيات سريعة</h3>
-    <div class="grid">
-      <div>الأكثر ظهوراً<b id="mostD">-</b></div>
-      <div>الأقل ظهوراً<b id="leastD">-</b></div>
-      <div>زوجي / فردي<b id="evenOdd">-</b></div>
-      <div>5+ / أقل من 5<b id="overUnder">-</b></div>
-      <div style="grid-column:span 2">التكرار الحالي لنفس الرقم<b id="streak">-</b></div>
+  <div class="ai">
+    <h4><span class="ico">≋</span> AI Market Analyzer</h4>
+    <div class="item"><div class="k">Current Trend</div><div class="v" id="trend">-</div></div>
+    <div class="item"><div class="k">Deviation Strength</div><div class="v" id="strength">-</div></div>
+    <div class="item"><div class="k">Pattern Detected</div><div class="t" id="pattern">Waiting for data...</div></div>
+
+    <div class="duo">
+      <div class="pill" id="matchPill">Matches<small>-</small></div>
+      <div><div class="circle" id="circle">-</div><div class="cap" id="cd">0:10</div></div>
+      <div class="pill" id="diffPill">Differs<small>-</small></div>
     </div>
+    <div class="cap" style="margin-top:12px">Circle = most frequent digit (Matches) or least frequent digit (Differs) in the sample, refreshed every 10 seconds. It is a statistic, not a prediction.</div>
   </div>
 
-  <div class="card">
-    <h3>آخر 15 رقم</h3>
-    <div class="strip" id="strip"></div>
-  </div>
+  <h3>Digit Distribution (<span id="count">0</span> ticks)</h3>
+  <div class="bars" id="bars"><div class="line10"></div></div>
+  <div class="labels" id="labels"></div>
+  <div class="cap">Dashed line = 10% (equal share)</div>
+
+  <h3>Last 15 digits</h3>
+  <div class="strip" id="strip"></div>
 
   <div class="note">
-    ⚠️ هادي إحصائيات لما وقع فعلاً، ماشي توقعات. مؤشرات Deriv الاصطناعية كتولد الأرقام عشوائياً، فأي نمط كيبان ما كيضمن الرقم الجاي. ما تراهنش بفلوس ما تقدرش تخسرها.
+    ⚠️ Statistics of past digits only, not predictions. Deriv synthetic indices generate random digits, so no pattern guarantees the next one. Never trade money you can't afford to lose.<br>
+    ⚠️ هادي إحصائيات لما وقع فعلاً، ماشي توقعات.
   </div>
-  <div id="errorLog" class="error-log"></div>
-  <div class="dbg" id="dbg">سجل التشخيص: فارغ</div>
+  <div class="err" id="errorLog"></div>
+
+  <footer><b>Expert Analysis Tool</b><br>Live digit statistics for Deriv synthetic indices.</footer>
 </div>
 
 <script>
-  // رابط Deriv العمومي: بلا token وبلا نادل
   const WS_URL = 'wss://api.derivws.com/trading/v1/options/ws/public';
   const MAX = 1000;
   const $ = (id) => document.getElementById(id);
 
   let ws = null, hws = null, mode = null, demoTimer = null;
-  let digits = [], pip = 2, pipKnown = false, demoPrice = 1000;
+  let digits = [], prices = [], pip = 2, pipKnown = false, demoPrice = 1000;
+  let strategy = 'even', contract = 'matches', snap = null, cd = 10;
   const dbg = [];
 
   function log(t) { dbg.push(t); if (dbg.length > 12) dbg.shift(); $('dbg').textContent = dbg.join('\n'); }
-  function setStatus(text, color) { $('statusText').textContent = text; $('statusText').style.color = color || '#94a3b8'; }
+  function setLive(text, cls) { $('liveTxt').textContent = text; $('liveTxt').className = 'live ' + (cls || ''); }
   function showError(t) { const e = $('errorLog'); e.style.display = 'block'; e.textContent = t; }
   function clearError() { $('errorLog').style.display = 'none'; }
+  const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  const pct = (x, n) => (n ? (x / n) * 100 : 0);
 
   function pushDigit(price, p) {
     if (typeof p === 'number') { pip = p; pipKnown = true; }
     const s = Number(price).toFixed(pip);
     digits.push(Number(s.charAt(s.length - 1)));
-    if (digits.length > MAX) digits.shift();
+    prices.push(Number(price));
+    if (digits.length > MAX) { digits.shift(); prices.shift(); }
     return s;
   }
 
   function onTick(price, p) {
-    const s = pushDigit(price, p);
-    $('price').textContent = s;
-    $('last').textContent = digits[digits.length - 1];
+    $('price').textContent = pushDigit(price, p);
     render();
   }
 
-  function render() {
+  function getStats() {
     const n = Number($('win').value);
-    const w = digits.slice(-n), total = w.length;
+    const w = digits.slice(-n), pw = prices.slice(-n);
     const counts = Array(10).fill(0);
     w.forEach((d) => counts[d]++);
-    const max = Math.max(...counts), min = Math.min(...counts);
+    return { w, pw, total: w.length, counts, max: Math.max(...counts), min: Math.min(...counts) };
+  }
+
+  // The circle: most frequent digit (Matches) or least frequent (Differs)
+  function updateSnap() {
+    const s = getStats();
+    snap = s.total < 30 ? null : (contract === 'matches' ? s.counts.indexOf(s.max) : s.counts.indexOf(s.min));
+    renderSnap(s);
+  }
+
+  function renderSnap(s) {
+    s = s || getStats();
+    $('circle').textContent = snap === null ? '-' : snap;
+    if (snap === null) {
+      $('matchPill').innerHTML = 'Matches<small>-</small>';
+      $('diffPill').innerHTML = 'Differs<small>-</small>';
+    } else {
+      const p = pct(s.counts[snap], s.total);
+      $('matchPill').innerHTML = `Matches<small>${p.toFixed(1)}%</small>`;
+      $('diffPill').innerHTML = `Differs<small>${(100 - p).toFixed(1)}%</small>`;
+    }
+    $('matchPill').classList.toggle('sel', contract === 'matches');
+    $('diffPill').classList.toggle('sel', contract === 'differs');
+  }
+
+  function setContract(c) {
+    contract = c; $('contract').value = c; cd = 10; updateSnap();
+  }
+
+  function render() {
+    const s = getStats();
+    const { w, pw, total, counts, max, min } = s;
     const mark = total >= 30 && max > min;
 
     let bars = '<div class="line10"></div>', labels = '';
     for (let i = 0; i < 10; i++) {
-      const pct = total ? (counts[i] / total) * 100 : 0;
+      const p = pct(counts[i], total);
       const cls = mark && counts[i] === max ? 'hi' : mark && counts[i] === min ? 'lo' : '';
-      bars += `<div class="bar ${cls}" style="height:${Math.min(pct * 5, 118)}px"></div>`;
-      labels += `<div><b>${i}</b>${pct.toFixed(1)}%</div>`;
+      bars += `<div class="bar ${cls}" style="height:${Math.min(p * 5, 108)}px"></div>`;
+      labels += `<div><b>${i}</b>${p.toFixed(1)}%</div>`;
     }
     $('bars').innerHTML = bars;
     $('labels').innerHTML = labels;
     $('count').textContent = total;
-
-    if (total) {
-      $('mostD').textContent = counts.indexOf(max) + ' (' + ((max / total) * 100).toFixed(1) + '%)';
-      $('leastD').textContent = counts.indexOf(min) + ' (' + ((min / total) * 100).toFixed(1) + '%)';
-      const even = w.filter((d) => d % 2 === 0).length, over = w.filter((d) => d >= 5).length;
-      $('evenOdd').textContent = ((even / total) * 100).toFixed(0) + '% / ' + (100 - (even / total) * 100).toFixed(0) + '%';
-      $('overUnder').textContent = ((over / total) * 100).toFixed(0) + '% / ' + (100 - (over / total) * 100).toFixed(0) + '%';
-      let s = 1;
-      for (let i = digits.length - 2; i >= 0 && digits[i] === digits[digits.length - 1]; i--) s++;
-      $('streak').textContent = s + ' × (الرقم ' + digits[digits.length - 1] + ')';
-    } else {
-      ['mostD', 'leastD', 'evenOdd', 'overUnder', 'streak'].forEach((id) => ($(id).textContent = '-'));
-    }
     $('strip').innerHTML = digits.slice(-15).map((d) => `<span>${d}</span>`).join('');
+
+    // Strategy Selector
+    const even = w.filter((d) => d % 2 === 0).length;
+    const over = w.filter((d) => d >= 5).length;
+    let up = 0, down = 0;
+    for (let i = 1; i < pw.length; i++) { if (pw[i] > pw[i - 1]) up++; else if (pw[i] < pw[i - 1]) down++; }
+    const S = {
+      even: [pct(even, total), 'Even', 'Odd'],
+      odd: [pct(total - even, total), 'Odd', 'Even'],
+      over: [pct(over, total), 'Over 4', 'Under 5'],
+      under: [pct(total - over, total), 'Under 5', 'Over 4'],
+      rise: [pct(up, up + down), 'Rise', 'Fall'],
+      fall: [pct(down, up + down), 'Fall', 'Rise'],
+    }[strategy];
+    $('stratTxt').textContent = total ? `${S[1]}: ${S[0].toFixed(1)}%  |  ${S[2]}: ${(100 - S[0]).toFixed(1)}%  (expected about 50%)` : 'Start the analysis to see live numbers.';
+    $('stratFill').style.width = (total ? S[0] : 0) + '%';
+
+    // AI Market Analyzer (statistics only)
+    if (total < 30) {
+      $('trend').textContent = '-'; $('strength').textContent = '-';
+      $('pattern').textContent = 'Collecting data... (' + total + '/30 ticks)';
+    } else {
+      const t = pw.slice(-30), a = avg(t.slice(0, 15)), b = avg(t.slice(15)), rel = (b - a) / a;
+      const tr = rel > 0.00003 ? 'Uptrend' : rel < -0.00003 ? 'Downtrend' : 'Sideways';
+      $('trend').textContent = tr;
+      $('trend').style.color = tr === 'Uptrend' ? '#059669' : tr === 'Downtrend' ? '#dc2626' : '#64748b';
+
+      const lead = counts.indexOf(max), p = max / total;
+      const z = (p - 0.1) / Math.sqrt(0.09 / total);
+      const st = z < 2 ? 'Weak' : z < 3 ? 'Moderate' : 'Strong';
+      $('strength').textContent = st;
+      $('strength').style.color = st === 'Weak' ? '#64748b' : '#ea580c';
+      const name = $('symbolSelect').selectedOptions[0].text;
+      $('pattern').textContent = `Digit ${lead} is leading on ${name} (${(p * 100).toFixed(1)}% vs 10% expected), ` +
+        (z < 2 ? "but the gap isn't meaningful yet. That is normal for random digits."
+               : "a bigger gap than usual, but past digits do not predict the next one.");
+    }
+
+    if (snap === null && total >= 30) updateSnap(); else renderSnap(s);
   }
 
   function resetStats() {
-    digits = []; pipKnown = false;
+    digits = []; prices = []; pipKnown = false; snap = null; cd = 10;
     $('price').textContent = '---';
-    $('last').textContent = '-';
     render();
   }
 
@@ -184,17 +290,17 @@
     if (hws) { hws.onclose = null; hws.onmessage = null; hws.close(); hws = null; }
     if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
     mode = null;
-    $('liveBtn').textContent = 'بيانات مباشرة'; $('liveBtn').classList.remove('stop');
-    $('demoBtn').textContent = 'وضع تجريبي'; $('demoBtn').classList.remove('stop');
-    setStatus('غير متصل');
+    $('liveBtn').textContent = 'START ANALYSIS';
+    $('demoBtn').textContent = 'Try demo mode (fake random data)';
+    setLive('Disconnected');
   }
 
-  /* ---------- بيانات مباشرة من Deriv (بلا token) ---------- */
+  /* ---------- Live data from Deriv (no token needed) ---------- */
   function toggleLive() {
     if (mode === 'live') { stopAll(); return; }
     stopAll(); resetStats(); clearError(); dbg.length = 0;
     mode = 'live';
-    setStatus('جاري الاتصال بـ Deriv...');
+    setLive('Connecting...');
     log('connecting: ' + WS_URL);
     const sym = $('symbolSelect').value;
     const sock = new WebSocket(WS_URL);
@@ -202,41 +308,37 @@
     let opened = false, msgCount = 0, gotTick = false;
 
     sock.onopen = () => {
-      opened = true;
-      log('open OK');
-      setStatus('متصل ✅ جاري جلب الأرقام...', '#22c55e');
-      $('liveBtn').textContent = 'إيقاف'; $('liveBtn').classList.add('stop');
+      opened = true; log('open OK');
+      $('liveBtn').textContent = 'STOP ANALYSIS';
       sock.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
       log('sent: ticks ' + sym);
       loadHistory(sym);
     };
-
     sock.onmessage = (m) => {
       if (msgCount++ < 3) log('msg: ' + String(m.data).slice(0, 110));
       let data;
       try { data = JSON.parse(m.data); } catch (e) { return; }
       const err = data.error || (data.errors && data.errors[0]);
-      if (err) { showError('خطأ من السيرفر: ' + (err.message || JSON.stringify(err))); return; }
+      if (err) { showError('Server error: ' + (err.message || JSON.stringify(err))); return; }
       if (data.tick) {
         const t = data.tick;
         const q = t.quote !== undefined ? t.quote : (t.price !== undefined ? t.price : t.bid);
         if (q !== undefined) {
           onTick(q, t.pip_size);
-          if (!gotTick) { gotTick = true; setStatus('متصل ✅ الأرقام كتوصل', '#22c55e'); }
+          if (!gotTick) { gotTick = true; setLive('Live Data Connected', 'on'); }
         }
       }
     };
-
     sock.onerror = () => log('error event');
     sock.onclose = (e) => {
       log('close code=' + e.code + ' reason=' + (e.reason || '-') + ' opened=' + opened);
       if (ws !== sock) return;
       stopAll();
-      setStatus(opened ? 'انقطع الاتصال' : 'تعذر الاتصال بـ Deriv', '#ef4444');
+      setLive(opened ? 'Connection lost' : 'Could not connect', 'bad');
     };
   }
 
-  // التاريخ كيتجلب فاتصال منفصل، باش إلا فشل ما يوقفش الأرقام المباشرة
+  // History loads on a separate connection, so a failure never stops live data
   function loadHistory(sym) {
     const h = new WebSocket(WS_URL);
     hws = h;
@@ -248,35 +350,51 @@
       if (d.history && d.history.prices && mode === 'live') {
         const p = typeof d.pip_size === 'number' ? d.pip_size : (pipKnown ? pip : null);
         if (p === null) { log('history skipped: pip unknown'); }
-        else {
-          digits = [];
-          d.history.prices.forEach((x) => pushDigit(x, p));
-          render();
-        }
+        else { digits = []; prices = []; d.history.prices.forEach((x) => pushDigit(x, p)); render(); }
       }
       h.onclose = null; h.close(); if (hws === h) hws = null;
     };
     h.onerror = () => log('history error');
   }
 
-  /* ---------- وضع تجريبي (أرقام عشوائية للتجربة فقط) ---------- */
+  /* ---------- Demo mode (random numbers made by this page) ---------- */
   function toggleDemo() {
     if (mode === 'demo') { stopAll(); return; }
     stopAll(); resetStats(); clearError();
     mode = 'demo';
-    $('demoBtn').textContent = 'إيقاف'; $('demoBtn').classList.add('stop');
-    setStatus('وضع تجريبي: أرقام عشوائية مولّدة عندي، ماشي من Deriv', '#f59e0b');
+    $('demoBtn').textContent = 'Stop demo';
+    $('liveBtn').textContent = 'STOP ANALYSIS';
+    setLive('Demo data (fake random numbers)', 'bad');
     demoTimer = setInterval(() => {
       demoPrice += (Math.random() - 0.5) * 2;
       onTick(demoPrice, 2);
     }, 400);
   }
 
+  // 10-second refresh of the circle
+  setInterval(() => {
+    if (mode) { cd--; if (cd < 0) { cd = 10; updateSnap(); } } else { cd = 10; }
+    $('cd').textContent = '0:' + String(Math.max(cd, 0)).padStart(2, '0');
+  }, 1000);
+
+  $('menuBtn').addEventListener('click', () => {
+    const m = $('menu'); m.style.display = m.style.display === 'block' ? 'none' : 'block';
+  });
   $('symbolSelect').addEventListener('change', () => {
+    $('symName').textContent = $('symbolSelect').selectedOptions[0].text;
     resetStats();
     if (mode === 'live') { stopAll(); toggleLive(); }
   });
-  $('win').addEventListener('change', render);
+  $('win').addEventListener('change', () => { updateSnap(); render(); });
+  $('contract').addEventListener('change', () => setContract($('contract').value));
+  $('matchPill').addEventListener('click', () => setContract('matches'));
+  $('diffPill').addEventListener('click', () => setContract('differs'));
+  $('strats').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    strategy = b.dataset.s;
+    document.querySelectorAll('#strats button').forEach((x) => x.classList.toggle('sel', x === b));
+    render();
+  });
   render();
 </script>
 </body>
