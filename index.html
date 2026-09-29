@@ -70,11 +70,15 @@
   <div id="menu">
     <div class="lab" style="margin-top:0">Sample size</div>
     <select id="win">
+      <option value="20">Last 20 ticks</option>
+      <option value="50">Last 50 ticks</option>
       <option value="100">Last 100 ticks</option>
       <option value="300">Last 300 ticks</option>
       <option value="500" selected>Last 500 ticks</option>
       <option value="1000">Last 1000 ticks</option>
     </select>
+    <div class="lab">Circle refresh</div>
+    <select id="rf"><option value="10">Every 10 seconds</option><option value="tick">Every new tick</option></select>
     <button class="link" id="demoBtn" onclick="toggleDemo()">Try demo mode (fake random data)</button>
     <div class="lab">Diagnostics</div>
     <pre id="dbg">-</pre>
@@ -138,6 +142,7 @@
       <div class="pill" id="diffPill">Differs<small>-</small></div>
     </div>
     <div class="cap" style="margin-top:12px">Circle = most frequent digit (Matches) or least frequent digit (Differs) in the sample, refreshed every 10 seconds. It is a statistic, not a prediction.</div>
+    <div class="item" style="margin-top:12px"><div class="k">Reality check <a href="#" id="scoreReset" style="float:right;color:#2563eb">reset</a></div><div class="v" id="score" style="font-size:20px">0 tries</div><div class="cap" id="scoreNote" style="text-align:left">Counts how often the next tick really matched the circle.</div></div>
   </div>
 
   <h3>Digit Distribution (<span id="count">0</span> ticks)</h3>
@@ -185,8 +190,24 @@
 
   function onTick(price, p) {
     $('price').textContent = pushDigit(price, p);
+    const d = digits[digits.length - 1];
+    if (snap !== null) {
+      sc.n++;
+      if (contract === 'matches' ? d === snap : d !== snap) sc.h++;
+      renderScore();
+    }
     render();
+    if (fast && mode) updateSnap();
   }
+
+  const sc = { n: 0, h: 0 };
+  let fast = false;
+  function renderScore() {
+    const m = contract === 'matches', r = sc.n ? (sc.h / sc.n) * 100 : 0;
+    $('score').textContent = sc.n ? `${sc.h} of ${sc.n} hit (${r.toFixed(1)}%)` : '0 tries';
+    $('scoreNote').textContent = `Pure chance for ${m ? 'Matches' : 'Differs'} is ${m ? '10%' : '90%'}. Under about 300 tries this number is mostly luck.`;
+  }
+  function resetScore() { sc.n = 0; sc.h = 0; renderScore(); }
 
   function getStats() {
     const n = Number($('win').value);
@@ -219,7 +240,7 @@
   }
 
   function setContract(c) {
-    contract = c; $('contract').value = c; cd = 10; updateSnap();
+    contract = c; $('contract').value = c; cd = 10; resetScore(); updateSnap();
   }
 
   function render() {
@@ -371,31 +392,4 @@
     }, 400);
   }
 
-  // 10-second refresh of the circle
-  setInterval(() => {
-    if (mode) { cd--; if (cd < 0) { cd = 10; updateSnap(); } } else { cd = 10; }
-    $('cd').textContent = '0:' + String(Math.max(cd, 0)).padStart(2, '0');
-  }, 1000);
-
-  $('menuBtn').addEventListener('click', () => {
-    const m = $('menu'); m.style.display = m.style.display === 'block' ? 'none' : 'block';
-  });
-  $('symbolSelect').addEventListener('change', () => {
-    $('symName').textContent = $('symbolSelect').selectedOptions[0].text;
-    resetStats();
-    if (mode === 'live') { stopAll(); toggleLive(); }
-  });
-  $('win').addEventListener('change', () => { updateSnap(); render(); });
-  $('contract').addEventListener('change', () => setContract($('contract').value));
-  $('matchPill').addEventListener('click', () => setContract('matches'));
-  $('diffPill').addEventListener('click', () => setContract('differs'));
-  $('strats').addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    strategy = b.dataset.s;
-    document.querySelectorAll('#strats button').forEach((x) => x.classList.toggle('sel', x === b));
-    render();
-  });
-  render();
-</script>
-</body>
-</html>
+  // 10-second refres
