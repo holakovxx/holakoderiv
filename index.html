@@ -392,4 +392,41 @@
     }, 400);
   }
 
-  // 10-second refres
+  // 10-second refresh of the circle
+  setInterval(() => {
+    if (mode) { cd--; if (cd < 0) { cd = 10; updateSnap(); } } else { cd = 10; }
+    if (!fast) $('cd').textContent = '0:' + String(Math.max(cd, 0)).padStart(2, '0');
+  }, 1000);
+
+  // Phones pause background tabs to save battery, so the 10s timer above
+  // can freeze while you're away in another app. Catch up the moment
+  // you come back, instead of showing a stale number.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && mode) { cd = 10; updateSnap(); }
+  });
+  window.addEventListener('focus', () => { if (mode) { cd = 10; updateSnap(); } });
+
+  $('menuBtn').addEventListener('click', () => {
+    const m = $('menu'); m.style.display = m.style.display === 'block' ? 'none' : 'block';
+  });
+  $('symbolSelect').addEventListener('change', () => {
+    $('symName').textContent = $('symbolSelect').selectedOptions[0].text;
+    resetStats();
+    if (mode === 'live') { stopAll(); toggleLive(); }
+  });
+  $('win').addEventListener('change', () => { resetScore(); updateSnap(); render(); });
+  $('rf').addEventListener('change', () => { fast = $('rf').value === 'tick'; $('cd').textContent = fast ? 'live' : '0:10'; resetScore(); updateSnap(); });
+  $('scoreReset').addEventListener('click', (e) => { e.preventDefault(); resetScore(); });
+  $('contract').addEventListener('change', () => setContract($('contract').value));
+  $('matchPill').addEventListener('click', () => setContract('matches'));
+  $('diffPill').addEventListener('click', () => setContract('differs'));
+  $('strats').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    strategy = b.dataset.s;
+    document.querySelectorAll('#strats button').forEach((x) => x.classList.toggle('sel', x === b));
+    render();
+  });
+  render();
+</script>
+</body>
+</html>
