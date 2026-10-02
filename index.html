@@ -369,4 +369,148 @@
       $('trend').textContent = tr;
       $('trend').style.color = tr === 'Uptrend' ? '#059669' : tr === 'Downtrend' ? '#dc2626' : '#64748b';
 
- 
+      const lead = counts.indexOf(max), p = max / total;
+      const z = (p - 0.1) / Math.sqrt(0.09 / total);
+      const st = z < 2 ? 'Weak' : z < 3 ? 'Moderate' : 'Strong';
+      $('strength').textContent = st;
+      $('strength').style.color = st === 'Weak' ? '#64748b' : '#ea580c';
+      const name = $('symbolSelect').selectedOptions[0].text;
+      $('pattern').textContent = `Digit ${lead} is leading on ${name} (${(p * 100).toFixed(1)}% vs 10% expected), ` +
+        (z < 2 ? "but the gap isn't meaningful yet. That is normal for random digits."
+               : "a bigger gap than usual, but past digits do not predict the next one.");
+    }
+
+    if (snap === null && total >= 30) updateSnap(); else renderSnap(s);
+  }
+
+  function resetStats() {
+    digits = []; prices = []; pipKnown = false; snap = null; cd = 10;
+    $('price').textContent = '---';
+    render();
+  }
+
+  function stopAll() {
+    if (ws) { ws.onclose = null; ws.close(); ws = null; }
+    if (hws) { hws.onclose = null; hws.onmessage = null; hws.close(); hws = null; }
+    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+    mode = null;
+    $('liveBtn').textContent = 'START ANALYSIS';
+    $('demoBtn').textContent = 'Try demo mode (fake random data)';
+    setLive('Disconnected');
+  }
+
+  /* ---------- Live data from Deriv (no token needed) ---------- */
+  function toggleLive() {
+    if (mode === 'live') { stopAll(); return; }
+    stopAll(); resetStats(); clearError(); dbg.length = 0;
+    mode = 'live';
+    setLive('Connecting...');
+    log('connecting: ' + WS_URL);
+    const sym = $('symbolSelect').value;
+    const sock = new WebSocket(WS_URL);
+    ws = sock;
+    let opened = false, msgCount = 0, gotTick = false;
+
+    sock.onopen = () => {
+      opened = true; log('open OK');
+      $('liveBtn').textContent = 'STOP ANALYSIS';
+      sock.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
+      log('sent: ticks ' + sym);
+      loadHistory(sym);
+    };
+    sock.onmessage = (m) => {
+      if (msgCount++ < 3) log('msg: ' + String(m.data).slice(0, 110));
+      let data;
+      try { data = JSON.parse(m.data); } catch (e) { return; }
+      const err = data.error || (data.errors && data.errors[0]);
+      if (err) { showError('Server error: ' + (err.message || JSON.stringify(err))); return; }
+      if (data.tick) {
+        const t = data.tick;
+        const q = t.quote !== undefined ? t.quote : (t.price !== undefined ? t.price : t.bid);
+        if (q !== undefined) {
+          onTick(q, t.pip_size);
+          if (!gotTick) { gotTick = true; setLive('Live Data Connected', 'on'); }
+        }
+      }
+    };
+    sock.onerror = () => log('error event');
+    sock.onclose = (e) => {
+      log('close code=' + e.code + ' reason=' + (e.reason || '-') + ' opened=' + opened);
+      if (ws !== sock) return;
+      stopAll();
+      setLive(opened ? 'Connection lost' : 'Could not connect', 'bad');
+    };
+  }
+
+  // History loads on a separate connection, so a failure never stops live data
+  function loadHistory(sym) {
+    const h = new WebSocket(WS_URL);
+    hws = h;
+    h.onopen = () => h.send(JSON.stringify({ ticks_history: sym, count: 500, end: 'latest', style: 'ticks' }));
+    h.onmessage = (m) => {
+      log('history: ' + String(m.data).slice(0, 80));
+      let d;
+      try { d = JSON.parse(m.data); } catch (e) { return; }
+      if (d.history && d.history.prices && mode === 'live') {
+        const p = typeof d.pip_size === 'number' ? d.pip_size : (pipKnown ? pip : null);
+        if (p === null) { log('history skipped: pip unknown'); }
+        else { digits = []; prices = []; d.history.prices.forEach((x) => pushDigit(x, p)); render(); }
+      }
+      h.onclose = null; h.close(); if (hws === h) hws = null;
+    };
+    h.onerror = () => log('history error');
+  }
+
+  /* ---------- Demo mode (random numbers made by this page) ---------- */
+  function toggleDemo() {
+    if (mode === 'demo') { stopAll(); return; }
+    stopAll(); resetStats(); clearError();
+    mode = 'demo';
+    $('demoBtn').textContent = 'Stop demo';
+    $('liveBtn').textContent = 'STOP ANALYSIS';
+    setLive('Demo data (fake random numbers)', 'bad');
+    demoTimer = setInterval(() => {
+      demoPrice += (Math.random() - 0.5) * 2;
+      onTick(demoPrice, 2);
+    }, 400);
+  }
+
+  // 10-second refresh of the circle
+  setInterval(() => {
+    if (mode) { cd--; if (cd < 0) { cd = 10; updateSnap(); } } else { cd = 10; }
+    if (!fast) $('cd').textContent = '0:' + String(Math.max(cd, 0)).padStart(2, '0');
+  }, 1000);
+
+  // Phones pause background tabs to save battery, so the 10s timer above
+  // can freeze while you're away in another app. Catch up the moment
+  // you come back, instead of showing a stale number.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && mode) { cd = 10; updateSnap(); }
+  });
+  window.addEventListener('focus', () => { if (mode) { cd = 10; updateSnap(); } });
+
+  $('menuBtn').addEventListener('click', () => {
+    const m = $('menu'); m.style.display = m.style.display === 'block' ? 'none' : 'block';
+  });
+  $('symbolSelect').addEventListener('change', () => {
+    $('symName').textContent = $('symbolSelect').selectedOptions[0].text;
+    resetStats();
+    if (mode === 'live') { stopAll(); toggleLive(); }
+  });
+  $('win').addEventListener('change', () => { resetScore(); updateSnap(); render(); });
+  $('rf').addEventListener('change', () => { fast = $('rf').value === 'tick'; $('cd').textContent = fast ? 'live' : '0:10'; resetScore(); updateSnap(); });
+  $('scoreReset').addEventListener('click', (e) => { e.preventDefault(); resetScore(); });
+  $('stopAck').addEventListener('click', () => { $('stopOverlay').style.display = 'none'; });
+  $('contract').addEventListener('change', () => setContract($('contract').value));
+  $('matchPill').addEventListener('click', () => setContract(famOf(contract) === 'md' ? 'matches' : famOf(contract) === 'eo' ? 'even' : 'over'));
+  $('diffPill').addEventListener('click', () => setContract(famOf(contract) === 'md' ? 'differs' : famOf(contract) === 'eo' ? 'odd' : 'under'));
+  $('strats').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    strategy = b.dataset.s;
+    document.querySelectorAll('#strats button').forEach((x) => x.classList.toggle('sel', x === b));
+    render();
+  });
+  render();
+</script>
+</body>
+</html>
