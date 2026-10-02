@@ -58,10 +58,23 @@
   pre { white-space: pre-wrap; word-break: break-all; font-size: 11px; color: #64748b; margin: 6px 0 0; }
   footer { margin: 26px 0 8px; font-size: 13px; color: #64748b; line-height: 1.5; }
   footer b { color: #0f172a; }
+  input[type=number] { width: 100%; padding: 13px 12px; border-radius: 12px; border: 1px solid #e2e8f0; font-size: 15px; background: #fff; color: #0f172a; }
+  .stopOverlay { position: fixed; inset: 0; background: rgba(15,23,42,.92); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .stopBox { background: #fff; border-radius: 18px; padding: 26px 22px; max-width: 360px; text-align: center; }
+  .stopTitle { font-size: 22px; font-weight: bold; color: #dc2626; margin-bottom: 10px; }
+  .stopMsg { font-size: 15px; color: #334155; line-height: 1.6; margin-bottom: 18px; }
+  .stopBtn { width: 100%; background: #0f172a; color: #fff; border-radius: 12px; padding: 14px; font-size: 15px; }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <div id="stopOverlay" class="stopOverlay" style="display:none">
+    <div class="stopBox">
+      <div class="stopTitle">⛔ وصلتي للحد</div>
+      <div class="stopMsg" id="stopMsg"></div>
+      <button class="stopBtn" id="stopAck">فهمت</button>
+    </div>
+  </div>
   <header>
     <h1>Expert Analysis <span>Tool</span></h1>
     <button id="menuBtn" aria-label="Menu">☰</button>
@@ -79,6 +92,10 @@
     </select>
     <div class="lab">Circle refresh</div>
     <select id="rf"><option value="10">Every 10 seconds</option><option value="tick">Every new tick</option></select>
+    <div class="lab">توقف من بعد شحال خسارة (اختياري)</div>
+    <input type="number" id="maxLoss" min="1" placeholder="مثلا 5" inputmode="numeric">
+    <div class="lab">إشارة دخول فاش النسبة تعدي ≥ (اختياري، للاختبار فقط)</div>
+    <input type="number" id="sigThr" min="1" max="99" placeholder="مثلا 30" inputmode="numeric">
     <button class="link" id="demoBtn" onclick="toggleDemo()">Try demo mode (fake random data)</button>
     <div class="lab">Diagnostics</div>
     <pre id="dbg">-</pre>
@@ -91,6 +108,10 @@
   <select id="contract">
     <option value="matches" selected>Matches</option>
     <option value="differs">Differs</option>
+    <option value="even">Even</option>
+    <option value="odd">Odd</option>
+    <option value="over">Over 4</option>
+    <option value="under">Under 5</option>
   </select>
 
   <div class="lab">Volatility</div>
@@ -141,7 +162,7 @@
       <div><div class="circle" id="circle">-</div><div class="cap" id="cd">0:10</div></div>
       <div class="pill" id="diffPill">Differs<small>-</small></div>
     </div>
-    <div class="cap" style="margin-top:12px">Circle = most frequent digit (Matches) or least frequent digit (Differs) in the sample, refreshed every 10 seconds. It is a statistic, not a prediction.</div>
+    <div class="cap" style="margin-top:12px">Circle = live read for whichever side is picked above (a digit for Matches/Differs, a live % for Even/Odd/Over/Under). It is a statistic, not a prediction.</div>
     <div class="item" style="margin-top:12px"><div class="k">Reality check <a href="#" id="scoreReset" style="float:right;color:#2563eb">reset</a></div><div class="v" id="score" style="font-size:20px">0 tries</div><div class="cap" id="scoreNote" style="text-align:left">Counts how often the next tick really matched the circle.</div></div>
   </div>
 
@@ -191,10 +212,16 @@
   function onTick(price, p) {
     $('price').textContent = pushDigit(price, p);
     const d = digits[digits.length - 1];
-    if (snap !== null) {
+    if (digits.length >= 30) {
       sc.n++;
-      if (contract === 'matches' ? d === snap : d !== snap) sc.h++;
+      if (isHit(d)) sc.h++;
+      const thr = parseFloat($('sigThr').value);
+      if (thr > 0 && lastPct !== null && lastPct >= thr) {
+        sg.n++;
+        if (isHit(d)) sg.h++;
+      }
       renderScore();
+      checkLimit();
     }
     render();
     if (fast && mode) updateSnap();
@@ -202,12 +229,52 @@
 
   const sc = { n: 0, h: 0 };
   let fast = false;
+  let limitHit = false;
+  let lastPct = null;
+  const sg = { n: 0, h: 0 };
   function renderScore() {
-    const m = contract === 'matches', r = sc.n ? (sc.h / sc.n) * 100 : 0;
-    $('score').textContent = sc.n ? `${sc.h} of ${sc.n} hit (${r.toFixed(1)}%)` : '0 tries';
-    $('scoreNote').textContent = `Pure chance for ${m ? 'Matches' : 'Differs'} is ${m ? '10%' : '90%'}. Under about 300 tries this number is mostly luck.`;
+    const fam = famOf(contract), r = sc.n ? (sc.h / sc.n) * 100 : 0;
+    const base = fam === 'md' ? (contract === 'matches' ? 10 : 90) : 50;
+    const side1 = contract === 'matches' || contract === 'even' || contract === 'over';
+    const side = side1 ? LBL[fam][0] : LBL[fam][1];
+    const thr = parseFloat($('sigThr').value);
+    const base1 = sc.n ? `${sc.h} of ${sc.n} overall (${r.toFixed(1)}%)` : '0 tries yet';
+    if (thr > 0) {
+      const r2 = sg.n ? (sg.h / sg.n) * 100 : 0;
+      $('score').textContent = `${base1} · after a ≥${thr}% signal: ${sg.n ? `${sg.h} of ${sg.n} (${r2.toFixed(1)}%)` : '0 tries yet'}`;
+      $('scoreNote').textContent = `If the signal were real, the second number should end up clearly higher than the first and above ${base}%. If they stay close, the signal is just noise — that is what the math predicts will happen.`;
+    } else {
+      $('score').textContent = base1;
+      $('scoreNote').textContent = `Pure chance for ${side} is about ${base}%. Under about 300 tries this number is mostly luck.`;
+    }
   }
-  function resetScore() { sc.n = 0; sc.h = 0; renderScore(); }
+  function resetScore() { sc.n = 0; sc.h = 0; sg.n = 0; sg.h = 0; limitHit = false; renderScore(); }
+  function checkLimit() {
+    const lim = parseInt($('maxLoss').value, 10);
+    const losses = sc.n - sc.h;
+    if (!limitHit && lim > 0 && losses >= lim) {
+      limitHit = true;
+      stopAll();
+      $('stopMsg').textContent = `وصلتي لـ ${lim} خسارة اللي حطيتي كحد. هادشي علامة باش توقف ليومة، ماشي أمر. التحليل مازال خدام تحت.`;
+      $('stopOverlay').style.display = 'flex';
+    }
+  }
+
+  const LBL = { md: ['Matches', 'Differs'], eo: ['Even', 'Odd'], ou: ['Over 4', 'Under 5'] };
+  function famOf(c) { return (c === 'matches' || c === 'differs') ? 'md' : (c === 'even' || c === 'odd') ? 'eo' : 'ou'; }
+  function sidePct(fam, w) {
+    if (!w.length) return 0;
+    if (fam === 'eo') return pct(w.filter((d) => d % 2 === 0).length, w.length);
+    return pct(w.filter((d) => d >= 5).length, w.length);
+  }
+  function isHit(d) {
+    if (contract === 'matches') return d === snap;
+    if (contract === 'differs') return d !== snap;
+    if (contract === 'even') return d % 2 === 0;
+    if (contract === 'odd') return d % 2 === 1;
+    if (contract === 'over') return d >= 5;
+    return d < 5;
+  }
 
   function getStats() {
     const n = Number($('win').value);
@@ -217,26 +284,42 @@
     return { w, pw, total: w.length, counts, max: Math.max(...counts), min: Math.min(...counts) };
   }
 
-  // The circle: most frequent digit (Matches) or least frequent (Differs)
+  // The circle: digit stat (Matches/Differs) or live % (Even/Odd/Over/Under)
   function updateSnap() {
     const s = getStats();
-    snap = s.total < 30 ? null : (contract === 'matches' ? s.counts.indexOf(s.max) : s.counts.indexOf(s.min));
+    if (famOf(contract) === 'md') {
+      snap = s.total < 30 ? null : (contract === 'matches' ? s.counts.indexOf(s.max) : s.counts.indexOf(s.min));
+    }
     renderSnap(s);
   }
 
   function renderSnap(s) {
     s = s || getStats();
-    $('circle').textContent = snap === null ? '-' : snap;
-    if (snap === null) {
-      $('matchPill').innerHTML = 'Matches<small>-</small>';
-      $('diffPill').innerHTML = 'Differs<small>-</small>';
+    const fam = famOf(contract), L1 = LBL[fam][0], L2 = LBL[fam][1];
+    $('matchPill').classList.toggle('sel', contract === 'matches' || contract === 'even' || contract === 'over');
+    $('diffPill').classList.toggle('sel', contract === 'differs' || contract === 'odd' || contract === 'under');
+    if (fam === 'md') {
+      $('circle').textContent = snap === null ? '-' : snap;
+      if (snap === null) {
+        $('matchPill').innerHTML = `${L1}<small>-</small>`;
+        $('diffPill').innerHTML = `${L2}<small>-</small>`;
+      } else {
+        const p = pct(s.counts[snap], s.total);
+        $('matchPill').innerHTML = `${L1}<small>${p.toFixed(1)}%</small>`;
+        $('diffPill').innerHTML = `${L2}<small>${(100 - p).toFixed(1)}%</small>`;
+        lastPct = p;
+      }
+    } else if (s.total < 30) {
+      $('circle').textContent = '-';
+      $('matchPill').innerHTML = `${L1}<small>-</small>`;
+      $('diffPill').innerHTML = `${L2}<small>-</small>`;
     } else {
-      const p = pct(s.counts[snap], s.total);
-      $('matchPill').innerHTML = `Matches<small>${p.toFixed(1)}%</small>`;
-      $('diffPill').innerHTML = `Differs<small>${(100 - p).toFixed(1)}%</small>`;
+      const p = sidePct(fam, s.w);
+      $('circle').textContent = p.toFixed(1) + '%';
+      $('matchPill').innerHTML = `${L1}<small>${p.toFixed(1)}%</small>`;
+      $('diffPill').innerHTML = `${L2}<small>${(100 - p).toFixed(1)}%</small>`;
+      lastPct = p;
     }
-    $('matchPill').classList.toggle('sel', contract === 'matches');
-    $('diffPill').classList.toggle('sel', contract === 'differs');
   }
 
   function setContract(c) {
@@ -286,147 +369,4 @@
       $('trend').textContent = tr;
       $('trend').style.color = tr === 'Uptrend' ? '#059669' : tr === 'Downtrend' ? '#dc2626' : '#64748b';
 
-      const lead = counts.indexOf(max), p = max / total;
-      const z = (p - 0.1) / Math.sqrt(0.09 / total);
-      const st = z < 2 ? 'Weak' : z < 3 ? 'Moderate' : 'Strong';
-      $('strength').textContent = st;
-      $('strength').style.color = st === 'Weak' ? '#64748b' : '#ea580c';
-      const name = $('symbolSelect').selectedOptions[0].text;
-      $('pattern').textContent = `Digit ${lead} is leading on ${name} (${(p * 100).toFixed(1)}% vs 10% expected), ` +
-        (z < 2 ? "but the gap isn't meaningful yet. That is normal for random digits."
-               : "a bigger gap than usual, but past digits do not predict the next one.");
-    }
-
-    if (snap === null && total >= 30) updateSnap(); else renderSnap(s);
-  }
-
-  function resetStats() {
-    digits = []; prices = []; pipKnown = false; snap = null; cd = 10;
-    $('price').textContent = '---';
-    render();
-  }
-
-  function stopAll() {
-    if (ws) { ws.onclose = null; ws.close(); ws = null; }
-    if (hws) { hws.onclose = null; hws.onmessage = null; hws.close(); hws = null; }
-    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
-    mode = null;
-    $('liveBtn').textContent = 'START ANALYSIS';
-    $('demoBtn').textContent = 'Try demo mode (fake random data)';
-    setLive('Disconnected');
-  }
-
-  /* ---------- Live data from Deriv (no token needed) ---------- */
-  function toggleLive() {
-    if (mode === 'live') { stopAll(); return; }
-    stopAll(); resetStats(); clearError(); dbg.length = 0;
-    mode = 'live';
-    setLive('Connecting...');
-    log('connecting: ' + WS_URL);
-    const sym = $('symbolSelect').value;
-    const sock = new WebSocket(WS_URL);
-    ws = sock;
-    let opened = false, msgCount = 0, gotTick = false;
-
-    sock.onopen = () => {
-      opened = true; log('open OK');
-      $('liveBtn').textContent = 'STOP ANALYSIS';
-      sock.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
-      log('sent: ticks ' + sym);
-      loadHistory(sym);
-    };
-    sock.onmessage = (m) => {
-      if (msgCount++ < 3) log('msg: ' + String(m.data).slice(0, 110));
-      let data;
-      try { data = JSON.parse(m.data); } catch (e) { return; }
-      const err = data.error || (data.errors && data.errors[0]);
-      if (err) { showError('Server error: ' + (err.message || JSON.stringify(err))); return; }
-      if (data.tick) {
-        const t = data.tick;
-        const q = t.quote !== undefined ? t.quote : (t.price !== undefined ? t.price : t.bid);
-        if (q !== undefined) {
-          onTick(q, t.pip_size);
-          if (!gotTick) { gotTick = true; setLive('Live Data Connected', 'on'); }
-        }
-      }
-    };
-    sock.onerror = () => log('error event');
-    sock.onclose = (e) => {
-      log('close code=' + e.code + ' reason=' + (e.reason || '-') + ' opened=' + opened);
-      if (ws !== sock) return;
-      stopAll();
-      setLive(opened ? 'Connection lost' : 'Could not connect', 'bad');
-    };
-  }
-
-  // History loads on a separate connection, so a failure never stops live data
-  function loadHistory(sym) {
-    const h = new WebSocket(WS_URL);
-    hws = h;
-    h.onopen = () => h.send(JSON.stringify({ ticks_history: sym, count: 500, end: 'latest', style: 'ticks' }));
-    h.onmessage = (m) => {
-      log('history: ' + String(m.data).slice(0, 80));
-      let d;
-      try { d = JSON.parse(m.data); } catch (e) { return; }
-      if (d.history && d.history.prices && mode === 'live') {
-        const p = typeof d.pip_size === 'number' ? d.pip_size : (pipKnown ? pip : null);
-        if (p === null) { log('history skipped: pip unknown'); }
-        else { digits = []; prices = []; d.history.prices.forEach((x) => pushDigit(x, p)); render(); }
-      }
-      h.onclose = null; h.close(); if (hws === h) hws = null;
-    };
-    h.onerror = () => log('history error');
-  }
-
-  /* ---------- Demo mode (random numbers made by this page) ---------- */
-  function toggleDemo() {
-    if (mode === 'demo') { stopAll(); return; }
-    stopAll(); resetStats(); clearError();
-    mode = 'demo';
-    $('demoBtn').textContent = 'Stop demo';
-    $('liveBtn').textContent = 'STOP ANALYSIS';
-    setLive('Demo data (fake random numbers)', 'bad');
-    demoTimer = setInterval(() => {
-      demoPrice += (Math.random() - 0.5) * 2;
-      onTick(demoPrice, 2);
-    }, 400);
-  }
-
-  // 10-second refresh of the circle
-  setInterval(() => {
-    if (mode) { cd--; if (cd < 0) { cd = 10; updateSnap(); } } else { cd = 10; }
-    if (!fast) $('cd').textContent = '0:' + String(Math.max(cd, 0)).padStart(2, '0');
-  }, 1000);
-
-  // Phones pause background tabs to save battery, so the 10s timer above
-  // can freeze while you're away in another app. Catch up the moment
-  // you come back, instead of showing a stale number.
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && mode) { cd = 10; updateSnap(); }
-  });
-  window.addEventListener('focus', () => { if (mode) { cd = 10; updateSnap(); } });
-
-  $('menuBtn').addEventListener('click', () => {
-    const m = $('menu'); m.style.display = m.style.display === 'block' ? 'none' : 'block';
-  });
-  $('symbolSelect').addEventListener('change', () => {
-    $('symName').textContent = $('symbolSelect').selectedOptions[0].text;
-    resetStats();
-    if (mode === 'live') { stopAll(); toggleLive(); }
-  });
-  $('win').addEventListener('change', () => { resetScore(); updateSnap(); render(); });
-  $('rf').addEventListener('change', () => { fast = $('rf').value === 'tick'; $('cd').textContent = fast ? 'live' : '0:10'; resetScore(); updateSnap(); });
-  $('scoreReset').addEventListener('click', (e) => { e.preventDefault(); resetScore(); });
-  $('contract').addEventListener('change', () => setContract($('contract').value));
-  $('matchPill').addEventListener('click', () => setContract('matches'));
-  $('diffPill').addEventListener('click', () => setContract('differs'));
-  $('strats').addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    strategy = b.dataset.s;
-    document.querySelectorAll('#strats button').forEach((x) => x.classList.toggle('sel', x === b));
-    render();
-  });
-  render();
-</script>
-</body>
-</html>
+ 
