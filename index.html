@@ -64,6 +64,7 @@
   .stopTitle { font-size: 22px; font-weight: bold; color: #dc2626; margin-bottom: 10px; }
   .stopMsg { font-size: 15px; color: #334155; line-height: 1.6; margin-bottom: 18px; }
   .stopBtn { width: 100%; background: #0f172a; color: #fff; border-radius: 12px; padding: 14px; font-size: 15px; }
+  .tsgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 </style>
 </head>
 <body>
@@ -139,6 +140,12 @@
     <button class="main" id="liveBtn" onclick="toggleLive()">START ANALYSIS</button>
   </div>
 
+  <div class="panel" id="mkPanel">
+    <div class="lab" style="margin:0 0 6px">Recommended volatility (live)</div>
+    <div class="cap" id="mkStat" style="text-align:left;margin:0 0 8px">Press START ANALYSIS to see it.</div>
+    <div id="mkOut"></div>
+  </div>
+
   <h3>Strategy Selector</h3>
   <div class="grid" id="strats">
     <button data-s="even" style="background:#3b82f6" class="sel">Even</button>
@@ -179,6 +186,49 @@
     ⚠️ هادي إحصائيات لما وقع فعلاً، ماشي توقعات.
   </div>
   <div class="err" id="errorLog"></div>
+
+  <h3>Signal tester</h3>
+  <div class="panel" id="tester">
+    <div dir="rtl" class="sub" style="margin-bottom:10px;text-align:right">اختبر أي إشارة (من أي موقع ولا أداة): سجل واش كانت صحيحة ولا غالطة، والأداة تحسب واش فعلا كتفوق الصدفة. <b>كتحكم على المصدر، ماشي كتقول "دخل دابا".</b></div>
+    <details dir="rtl" style="text-align:right;margin-bottom:12px;font-size:13px;color:#4A4F49;line-height:1.8">
+      <summary style="cursor:pointer;font-weight:600">كيفاش نستعملو؟</summary>
+      1) اختار نوع الصفقة باش الأداة تعرف شحال الصدفة.<br>
+      2) كل ما يعطيك المصدر إشارة، دخل الصفقة (Demo أولا)، ومن بعد ما تسالي ضغط ✅ ولا ❌.<br>
+      3) إلا كان المصدر كيوري "Confidence"، كتبو قبل ما تضغط (اختياري).<br>
+      4) باش تعرف واش تربح فعلا، كتب Stake و Payout (كيبان فDeriv قبل ما تأكد الصفقة).<br>
+      5) كمل حتى 100 إشارة على الأقل. قرر هاد العدد من قبل، وما توقفش فاش تعجبك النتيجة، حيت هادشي كيزور الحساب.
+    </details>
+    <div class="lab">Bet type</div>
+    <select id="tsPreset">
+      <option value="10">Matches (10%)</option>
+      <option value="90">Differs (90%)</option>
+      <option value="50">Even / Odd (50%)</option>
+      <option value="40">Over 5 (40%)</option>
+      <option value="50">Over 4 / Under 5 (50%)</option>
+    </select>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><div class="lab">Chance %</div><input type="number" id="tsBase" min="1" max="99" value="10" inputmode="decimal"></div>
+      <div style="flex:1"><div class="lab">Stake $</div><input type="number" id="tsStake" min="0" step="0.01" placeholder="1" inputmode="decimal"></div>
+      <div style="flex:1"><div class="lab">Payout $</div><input type="number" id="tsPay" min="0" step="0.01" placeholder="8.9" inputmode="decimal"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><div class="lab">Confidence shown (optional)</div><input type="number" id="tsConf" min="0" max="100" placeholder="75" inputmode="numeric"></div>
+      <div style="flex:1"><div class="lab">High-confidence from</div><input type="number" id="tsThr" min="1" max="100" value="70" inputmode="numeric"></div>
+    </div>
+    <div class="tsgrid" style="margin-top:14px">
+      <button id="tsHit" style="background:#059669;color:#fff;border-radius:12px;padding:14px 4px;font-size:14px">&#10003; Signal was right</button>
+      <button id="tsMiss" style="background:#dc2626;color:#fff;border-radius:12px;padding:14px 4px;font-size:14px">&#10007; Signal was wrong</button>
+    </div>
+    <div style="display:flex;gap:16px;margin:6px 0 4px">
+      <button class="link" id="tsUndo" style="background:none;color:#6366f1;font-size:13px;padding:10px 0">Undo last</button>
+      <button class="link" id="tsReset" style="background:none;color:#dc2626;font-size:13px;padding:10px 0">Reset all</button>
+    </div>
+    <div class="strip" id="tsStrip" style="margin:6px 0 10px"></div>
+    <div class="item"><div class="k">Result so far</div><div class="v" id="tsMain" style="font-size:15px">0 signals logged</div></div>
+    <div class="item"><div class="t" id="tsVerdict" dir="rtl" style="text-align:right"></div></div>
+    <div class="item" id="tsMoneyBox" style="display:none"><div class="t" id="tsMoney" dir="rtl" style="text-align:right"></div></div>
+    <div class="item" id="tsConfBox" style="display:none"><div class="t" id="tsConfOut" dir="rtl" style="text-align:right"></div></div>
+  </div>
 
   <footer><b>Expert Analysis Tool</b><br>Live digit statistics for Deriv synthetic indices.</footer>
 </div>
@@ -285,232 +335,4 @@
   }
 
   // The circle: digit stat (Matches/Differs) or live % (Even/Odd/Over/Under)
-  function updateSnap() {
-    const s = getStats();
-    if (famOf(contract) === 'md') {
-      snap = s.total < 30 ? null : (contract === 'matches' ? s.counts.indexOf(s.max) : s.counts.indexOf(s.min));
-    }
-    renderSnap(s);
-  }
-
-  function renderSnap(s) {
-    s = s || getStats();
-    const fam = famOf(contract), L1 = LBL[fam][0], L2 = LBL[fam][1];
-    $('matchPill').classList.toggle('sel', contract === 'matches' || contract === 'even' || contract === 'over');
-    $('diffPill').classList.toggle('sel', contract === 'differs' || contract === 'odd' || contract === 'under');
-    if (fam === 'md') {
-      $('circle').textContent = snap === null ? '-' : snap;
-      if (snap === null) {
-        $('matchPill').innerHTML = `${L1}<small>-</small>`;
-        $('diffPill').innerHTML = `${L2}<small>-</small>`;
-      } else {
-        const p = pct(s.counts[snap], s.total);
-        $('matchPill').innerHTML = `${L1}<small>${p.toFixed(1)}%</small>`;
-        $('diffPill').innerHTML = `${L2}<small>${(100 - p).toFixed(1)}%</small>`;
-        lastPct = p;
-      }
-    } else if (s.total < 30) {
-      $('circle').textContent = '-';
-      $('matchPill').innerHTML = `${L1}<small>-</small>`;
-      $('diffPill').innerHTML = `${L2}<small>-</small>`;
-    } else {
-      const p = sidePct(fam, s.w);
-      $('circle').textContent = p.toFixed(1) + '%';
-      $('matchPill').innerHTML = `${L1}<small>${p.toFixed(1)}%</small>`;
-      $('diffPill').innerHTML = `${L2}<small>${(100 - p).toFixed(1)}%</small>`;
-      lastPct = p;
-    }
-  }
-
-  function setContract(c) {
-    contract = c; $('contract').value = c; cd = 10; resetScore(); updateSnap();
-  }
-
-  function render() {
-    const s = getStats();
-    const { w, pw, total, counts, max, min } = s;
-    const mark = total >= 30 && max > min;
-
-    let bars = '<div class="line10"></div>', labels = '';
-    for (let i = 0; i < 10; i++) {
-      const p = pct(counts[i], total);
-      const cls = mark && counts[i] === max ? 'hi' : mark && counts[i] === min ? 'lo' : '';
-      bars += `<div class="bar ${cls}" style="height:${Math.min(p * 5, 108)}px"></div>`;
-      labels += `<div><b>${i}</b>${p.toFixed(1)}%</div>`;
-    }
-    $('bars').innerHTML = bars;
-    $('labels').innerHTML = labels;
-    $('count').textContent = total;
-    $('strip').innerHTML = digits.slice(-15).map((d) => `<span>${d}</span>`).join('');
-
-    // Strategy Selector
-    const even = w.filter((d) => d % 2 === 0).length;
-    const over = w.filter((d) => d >= 5).length;
-    let up = 0, down = 0;
-    for (let i = 1; i < pw.length; i++) { if (pw[i] > pw[i - 1]) up++; else if (pw[i] < pw[i - 1]) down++; }
-    const S = {
-      even: [pct(even, total), 'Even', 'Odd'],
-      odd: [pct(total - even, total), 'Odd', 'Even'],
-      over: [pct(over, total), 'Over 4', 'Under 5'],
-      under: [pct(total - over, total), 'Under 5', 'Over 4'],
-      rise: [pct(up, up + down), 'Rise', 'Fall'],
-      fall: [pct(down, up + down), 'Fall', 'Rise'],
-    }[strategy];
-    $('stratTxt').textContent = total ? `${S[1]}: ${S[0].toFixed(1)}%  |  ${S[2]}: ${(100 - S[0]).toFixed(1)}%  (expected about 50%)` : 'Start the analysis to see live numbers.';
-    $('stratFill').style.width = (total ? S[0] : 0) + '%';
-
-    // AI Market Analyzer (statistics only)
-    if (total < 30) {
-      $('trend').textContent = '-'; $('strength').textContent = '-';
-      $('pattern').textContent = 'Collecting data... (' + total + '/30 ticks)';
-    } else {
-      const t = pw.slice(-30), a = avg(t.slice(0, 15)), b = avg(t.slice(15)), rel = (b - a) / a;
-      const tr = rel > 0.00003 ? 'Uptrend' : rel < -0.00003 ? 'Downtrend' : 'Sideways';
-      $('trend').textContent = tr;
-      $('trend').style.color = tr === 'Uptrend' ? '#059669' : tr === 'Downtrend' ? '#dc2626' : '#64748b';
-
-      const lead = counts.indexOf(max), p = max / total;
-      const z = (p - 0.1) / Math.sqrt(0.09 / total);
-      const st = z < 2 ? 'Weak' : z < 3 ? 'Moderate' : 'Strong';
-      $('strength').textContent = st;
-      $('strength').style.color = st === 'Weak' ? '#64748b' : '#ea580c';
-      const name = $('symbolSelect').selectedOptions[0].text;
-      $('pattern').textContent = `Digit ${lead} is leading on ${name} (${(p * 100).toFixed(1)}% vs 10% expected), ` +
-        (z < 2 ? "but the gap isn't meaningful yet. That is normal for random digits."
-               : "a bigger gap than usual, but past digits do not predict the next one.");
-    }
-
-    if (snap === null && total >= 30) updateSnap(); else renderSnap(s);
-  }
-
-  function resetStats() {
-    digits = []; prices = []; pipKnown = false; snap = null; cd = 10;
-    $('price').textContent = '---';
-    render();
-  }
-
-  function stopAll() {
-    if (ws) { ws.onclose = null; ws.close(); ws = null; }
-    if (hws) { hws.onclose = null; hws.onmessage = null; hws.close(); hws = null; }
-    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
-    mode = null;
-    $('liveBtn').textContent = 'START ANALYSIS';
-    $('demoBtn').textContent = 'Try demo mode (fake random data)';
-    setLive('Disconnected');
-  }
-
-  /* ---------- Live data from Deriv (no token needed) ---------- */
-  function toggleLive() {
-    if (mode === 'live') { stopAll(); return; }
-    stopAll(); resetStats(); clearError(); dbg.length = 0;
-    mode = 'live';
-    setLive('Connecting...');
-    log('connecting: ' + WS_URL);
-    const sym = $('symbolSelect').value;
-    const sock = new WebSocket(WS_URL);
-    ws = sock;
-    let opened = false, msgCount = 0, gotTick = false;
-
-    sock.onopen = () => {
-      opened = true; log('open OK');
-      $('liveBtn').textContent = 'STOP ANALYSIS';
-      sock.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
-      log('sent: ticks ' + sym);
-      loadHistory(sym);
-    };
-    sock.onmessage = (m) => {
-      if (msgCount++ < 3) log('msg: ' + String(m.data).slice(0, 110));
-      let data;
-      try { data = JSON.parse(m.data); } catch (e) { return; }
-      const err = data.error || (data.errors && data.errors[0]);
-      if (err) { showError('Server error: ' + (err.message || JSON.stringify(err))); return; }
-      if (data.tick) {
-        const t = data.tick;
-        const q = t.quote !== undefined ? t.quote : (t.price !== undefined ? t.price : t.bid);
-        if (q !== undefined) {
-          onTick(q, t.pip_size);
-          if (!gotTick) { gotTick = true; setLive('Live Data Connected', 'on'); }
-        }
-      }
-    };
-    sock.onerror = () => log('error event');
-    sock.onclose = (e) => {
-      log('close code=' + e.code + ' reason=' + (e.reason || '-') + ' opened=' + opened);
-      if (ws !== sock) return;
-      stopAll();
-      setLive(opened ? 'Connection lost' : 'Could not connect', 'bad');
-    };
-  }
-
-  // History loads on a separate connection, so a failure never stops live data
-  function loadHistory(sym) {
-    const h = new WebSocket(WS_URL);
-    hws = h;
-    h.onopen = () => h.send(JSON.stringify({ ticks_history: sym, count: 500, end: 'latest', style: 'ticks' }));
-    h.onmessage = (m) => {
-      log('history: ' + String(m.data).slice(0, 80));
-      let d;
-      try { d = JSON.parse(m.data); } catch (e) { return; }
-      if (d.history && d.history.prices && mode === 'live') {
-        const p = typeof d.pip_size === 'number' ? d.pip_size : (pipKnown ? pip : null);
-        if (p === null) { log('history skipped: pip unknown'); }
-        else { digits = []; prices = []; d.history.prices.forEach((x) => pushDigit(x, p)); render(); }
-      }
-      h.onclose = null; h.close(); if (hws === h) hws = null;
-    };
-    h.onerror = () => log('history error');
-  }
-
-  /* ---------- Demo mode (random numbers made by this page) ---------- */
-  function toggleDemo() {
-    if (mode === 'demo') { stopAll(); return; }
-    stopAll(); resetStats(); clearError();
-    mode = 'demo';
-    $('demoBtn').textContent = 'Stop demo';
-    $('liveBtn').textContent = 'STOP ANALYSIS';
-    setLive('Demo data (fake random numbers)', 'bad');
-    demoTimer = setInterval(() => {
-      demoPrice += (Math.random() - 0.5) * 2;
-      onTick(demoPrice, 2);
-    }, 400);
-  }
-
-  // 10-second refresh of the circle
-  setInterval(() => {
-    if (mode) { cd--; if (cd < 0) { cd = 10; updateSnap(); } } else { cd = 10; }
-    if (!fast) $('cd').textContent = '0:' + String(Math.max(cd, 0)).padStart(2, '0');
-  }, 1000);
-
-  // Phones pause background tabs to save battery, so the 10s timer above
-  // can freeze while you're away in another app. Catch up the moment
-  // you come back, instead of showing a stale number.
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && mode) { cd = 10; updateSnap(); }
-  });
-  window.addEventListener('focus', () => { if (mode) { cd = 10; updateSnap(); } });
-
-  $('menuBtn').addEventListener('click', () => {
-    const m = $('menu'); m.style.display = m.style.display === 'block' ? 'none' : 'block';
-  });
-  $('symbolSelect').addEventListener('change', () => {
-    $('symName').textContent = $('symbolSelect').selectedOptions[0].text;
-    resetStats();
-    if (mode === 'live') { stopAll(); toggleLive(); }
-  });
-  $('win').addEventListener('change', () => { resetScore(); updateSnap(); render(); });
-  $('rf').addEventListener('change', () => { fast = $('rf').value === 'tick'; $('cd').textContent = fast ? 'live' : '0:10'; resetScore(); updateSnap(); });
-  $('scoreReset').addEventListener('click', (e) => { e.preventDefault(); resetScore(); });
-  $('stopAck').addEventListener('click', () => { $('stopOverlay').style.display = 'none'; });
-  $('contract').addEventListener('change', () => setContract($('contract').value));
-  $('matchPill').addEventListener('click', () => setContract(famOf(contract) === 'md' ? 'matches' : famOf(contract) === 'eo' ? 'even' : 'over'));
-  $('diffPill').addEventListener('click', () => setContract(famOf(contract) === 'md' ? 'differs' : famOf(contract) === 'eo' ? 'odd' : 'under'));
-  $('strats').addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    strategy = b.dataset.s;
-    document.querySelectorAll('#strats button').forEach((x) => x.classList.toggle('sel', x === b));
-    render();
-  });
-  render();
-</script>
-</body>
-</html>
+  function updateS
