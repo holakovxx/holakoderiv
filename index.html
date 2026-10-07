@@ -146,6 +146,14 @@
     <div id="mkOut"></div>
   </div>
 
+  <div class="panel" id="patPanel">
+    <div class="lab" style="margin:0 0 6px">Pattern test: is there a template?</div>
+    <div dir="rtl" class="sub" style="margin-bottom:10px;text-align:right">كيفحص التيكات الحقيقية ديال الأسواق العشرة (START ANALYSIS لازم يكون خدام): واش الرقم الجاي كيتبع الرقم لي قبلو، وواش كاينة طريقة بسيطة كتفوق 10% فـMatches. إلا كان "template" كيربح Matches ورا بعضهم، غادي يبان هنا.</div>
+    <button class="main" id="patBtn">RUN PATTERN TEST</button>
+    <div class="cap" id="patStat" style="margin-top:8px"></div>
+    <div id="patOut" style="margin-top:10px"></div>
+  </div>
+
   <h3>Strategy Selector</h3>
   <div class="grid" id="strats">
     <button data-s="even" style="background:#3b82f6" class="sel">Even</button>
@@ -756,6 +764,86 @@
   }
   $('contract').addEventListener('change', mkRender);
   $('win').addEventListener('change', mkRender);
+
+  // ---- pattern helpers ----
+  function lgam(z) {
+    const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    z -= 1; let x = c[0]; for (let i = 1; i < 9; i++) x += c[i] / (z + i);
+    const t = z + 7.5; return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+  function gammaQ(a, x) {
+    if (x <= 0) return 1;
+    const gln = lgam(a);
+    if (x < a + 1) {
+      let ap = a, sum = 1 / a, del = sum;
+      for (let n = 0; n < 1000; n++) { ap += 1; del *= x / ap; sum += del; if (Math.abs(del) < Math.abs(sum) * 1e-13) break; }
+      return Math.max(0, 1 - sum * Math.exp(-x + a * Math.log(x) - gln));
+    }
+    let b = x + 1 - a, c = 1e300, d = 1 / b, h = d;
+    for (let i = 1; i < 1000; i++) {
+      const an = -i * (i - a); b += 2; d = an * d + b; if (Math.abs(d) < 1e-300) d = 1e-300;
+      c = b + an / c; if (Math.abs(c) < 1e-300) c = 1e-300; d = 1 / d;
+      const del = d * c; h *= del; if (Math.abs(del - 1) < 1e-13) break;
+    }
+    return Math.exp(-x + a * Math.log(x) - gln) * h;
+  }
+  function chi2p(x, k) { return gammaQ(k / 2, x / 2); }
+  function patUniform(d) {
+    const n = d.length, c = Array(10).fill(0); d.forEach((v) => c[v]++);
+    const e = n / 10; let x = 0; c.forEach((k) => { x += (k - e) * (k - e) / e; });
+    return chi2p(x, 9);
+  }
+  function patLag(d, lag) {
+    const T = Array.from({ length: 10 }, () => Array(10).fill(0)); let n = 0;
+    for (let i = 0; i + lag < d.length; i++) { T[d[i]][d[i + lag]]++; n++; }
+    const r = T.map((row) => row.reduce((a, b) => a + b, 0)), col = Array(10).fill(0);
+    T.forEach((row) => row.forEach((v, j) => { col[j] += v; }));
+    let x = 0;
+    for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) { const e = r[i] * col[j] / n; if (e > 0) x += (T[i][j] - e) * (T[i][j] - e) / e; }
+    return chi2p(x, 81);
+  }
+  function patStrat(series, kind) {
+    let h = 0, n = 0; const W = 100;
+    series.forEach((d) => {
+      if (d.length < W + 5) return;
+      const c = Array(10).fill(0);
+      for (let i = 0; i < W; i++) c[d[i]]++;
+      for (let t = W - 1; t < d.length - 1; t++) {
+        let pred;
+        if (kind === 'last') pred = d[t];
+        else if (kind === 'lag2') pred = d[t - 1];
+        else { let best = 0; for (let k = 1; k < 10; k++) if (kind === 'hot' ? c[k] > c[best] : c[k] < c[best]) best = k; pred = best; }
+        n++; if (pred === d[t + 1]) h++;
+        c[d[t + 1]]++; c[d[t - W + 1]]--;
+      }
+    });
+    return { h, n };
+  }
+  function patRun(series) {
+    const names = { last: 'Same as the last digit', lag2: 'Same as 2 ticks ago', hot: 'Most frequent of last 100', cold: 'Least frequent of last 100' };
+    const strat = ['last', 'lag2', 'hot', 'cold'].map((k) => {
+      const r = patStrat(series, k), up = tsTail(r.n, r.h, 0.1), low = 1 - tsTail(r.n, r.h + 1, 0.1);
+      return { name: names[k], h: r.h, n: r.n, rate: (r.h / r.n) * 100, p: Math.min(1, 2 * Math.min(up, low)) };
+    });
+    return { u: series.map(patUniform), l1: series.map((d) => patLag(d, 1)), l2: series.map((d) => patLag(d, 2)), strat };
+  }
+  // ---- end pattern helpers ----
+  function patClick() {
+    const ser = []; MK_SYMS.forEach((x, i) => { if (mkOn && mkSeries[i] && mkSeries[i].length >= 500) ser.push(mkSeries[i]); });
+    if (ser.length < 3) { $('patStat').textContent = 'Press START ANALYSIS first and wait for "Live · 10/10 markets", then run it again.'; return; }
+    const r = patRun(ser), mn = (a) => Math.min(...a), lo = (a) => a.filter((p) => p < 0.05).length;
+    const total = ser.reduce((a, x) => a + x.length, 0);
+    const all = [...r.u, ...r.l1, ...r.l2, ...r.strat.map((s) => s.p)], minP = mn(all);
+    let html = `<div class="item" style="font-size:13px;line-height:1.7">Digits equally likely: smallest p = ${mn(r.u).toFixed(3)} (${lo(r.u)}/${ser.length} markets under 0.05; chance alone gives about ${(ser.length * 0.05).toFixed(1)})<br>Next digit depends on the last one: smallest p = ${mn(r.l1).toFixed(3)} (${lo(r.l1)} under 0.05)<br>Next digit depends on the one before: smallest p = ${mn(r.l2).toFixed(3)} (${lo(r.l2)} under 0.05)</div>`;
+    html += r.strat.map((s) => `<div class="item" style="margin-bottom:6px;display:flex;justify-content:space-between;font-size:13px"><span>${s.name}</span><span style="font-family:ui-monospace,Menlo,Consolas,monospace">${s.h}/${s.n} = ${s.rate.toFixed(2)}% \u00b7 p ${s.p.toFixed(2)}</span></div>`).join('');
+    const v = minP < 0.001
+      ? `\u26a0 فاش فالداتا شي حاجة غير عادية (أصغر p = ${minP.toExponential(1)}). عاود الاختبار من بعد باش تتأكد قبل ما تعتمد عليها.`
+      : `ما لقيت حتى template: كاملين الاختبارات فالمجال العادي ديال الصدفة (أصغر p = ${minP.toFixed(3)} من ${all.length} اختبار؛ من 34 اختبار، واحد ولا جوج تحت 0.05 هادشي عادي). الاستراتيجيات كاملين طلعو قريبين من 10%، يعني Matches ما كتتبعش هاد الأنماط. إلا كان template كيربح Matches ورا بعضهم كيبان هنا بفرق كبير.`;
+    html += `<div class="item"><div class="t" dir="rtl" style="text-align:right">${v}</div></div>`;
+    $('patOut').innerHTML = html;
+    $('patStat').textContent = `${ser.length} markets \u00b7 ${total.toLocaleString('en-US')} real ticks`;
+  }
+  $('patBtn').addEventListener('click', patClick);
 </script>
 </body>
 </html>
